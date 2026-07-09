@@ -1,8 +1,9 @@
 import { NodeSSH } from 'node-ssh';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import util from 'util';
 
 const execAsync = util.promisify(exec);
+const execFileAsync = util.promisify(execFile);
 
 export interface Environment {
   id: string;
@@ -18,9 +19,19 @@ export interface Environment {
   disabled?: boolean;
 }
 
-export async function executeCommand(env: Environment, command: string, cwd?: string): Promise<{ stdout: string; stderr: string }> {
+function escapeShellArg(arg: string) {
+  // Safe single-quoting for bash: 'arg' with inner single quotes escaped as '\''
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
+export async function executeCommand(env: Environment, command: string, args?: string[], cwd?: string): Promise<{ stdout: string; stderr: string }> {
   if (env.type === 'local') {
-    return execAsync(command, { cwd });
+    if (args) {
+      return execFileAsync(command, args, { cwd });
+    } else {
+      // Fallback for debug endpoint or complex bash pipes
+      return execAsync(command, { cwd });
+    }
   } else {
     const ssh = new NodeSSH();
     await ssh.connect({
@@ -30,9 +41,15 @@ export async function executeCommand(env: Environment, command: string, cwd?: st
       privateKey: env.privateKey,
     });
     
-    // node-ssh's cwd option can be flaky with spaces/special characters
-    // We manually prepend cd "${cwd}" && to ensure it executes correctly
-    const finalCommand = cwd ? `cd "${cwd}" && ${command}` : command;
+    let finalCommand = command;
+    if (args) {
+      finalCommand = `${command} ${args.map(escapeShellArg).join(' ')}`;
+    }
+    
+    if (cwd) {
+      finalCommand = `cd ${escapeShellArg(cwd)} && ${finalCommand}`;
+    }
+    
     const result = await ssh.execCommand(finalCommand);
     ssh.dispose();
     

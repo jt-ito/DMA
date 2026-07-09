@@ -8,36 +8,27 @@ export interface DockerContainer {
   Status: string;
   Ports: string;
   Labels?: string;
-  Project?: string; // from com.docker.compose.project label
-  Service?: string; // from com.docker.compose.service label
-  WorkingDir?: string; // from com.docker.compose.project.working_dir label
-  ConfigFiles?: string; // from com.docker.compose.project.config_files label
-  EnvironmentFiles?: string; // from com.docker.compose.project.environment_file label
+  Project?: string;
+  Service?: string;
+  WorkingDir?: string;
+  ConfigFiles?: string;
+  EnvironmentFiles?: string;
 }
 
 export async function getContainers(env: Environment): Promise<DockerContainer[]> {
-  // We use format '{{json .}}' to get JSON output per line.
-  // We need all containers so `docker ps -a`
-  const { stdout } = await executeCommand(env, 'docker ps -a --format "{{json .}}"');
+  const { stdout } = await executeCommand(env, 'docker', ['ps', '-a', '--format', '{{json .}}']);
   
-  // Docker output might be multiple JSON objects separated by newlines
   const lines = stdout.trim().split('\n').filter(line => line.length > 0);
-  
-  // Parse basic container info
   const containers: DockerContainer[] = lines.map(line => JSON.parse(line));
   
-  // To get labels like compose project/service, we need docker inspect
-  // If there are no containers, return early
   if (containers.length === 0) return [];
   
-  const containerIds = containers.map(c => c.ID).join(' ');
-  const inspectCmd = `docker inspect --format="{{json .Config.Labels}}" ${containerIds}`;
+  const containerIds = containers.map(c => c.ID);
   
   try {
-    const { stdout: inspectOut } = await executeCommand(env, inspectCmd);
+    const { stdout: inspectOut } = await executeCommand(env, 'docker', ['inspect', '--format={{json .Config.Labels}}', ...containerIds]);
     const inspectLines = inspectOut.trim().split('\n').filter(line => line.length > 0);
     
-    // Merge labels
     for (let i = 0; i < containers.length; i++) {
        if (inspectLines[i] && inspectLines[i] !== 'null') {
            const labels = JSON.parse(inspectLines[i]);
@@ -49,7 +40,6 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
        }
     }
   } catch (e) {
-    // If inspect fails, we just return basic info
     console.warn("Failed to inspect containers for labels:", e);
   }
   
@@ -57,55 +47,56 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
 }
 
 export async function manageContainer(env: Environment, id: string, action: 'start' | 'stop' | 'restart' | 'remove'): Promise<void> {
-  const cmd = action === 'remove' ? `docker rm -f ${id}` : `docker ${action} ${id}`;
-  await executeCommand(env, cmd);
+  const args = action === 'remove' ? ['rm', '-f', id] : [action, id];
+  await executeCommand(env, 'docker', args);
 }
 
-export async function composeCommand(env: Environment, command: string, workingDir: string, serviceName?: string, configFiles?: string, environmentFiles?: string): Promise<void> {
-  const serviceArg = serviceName ? ` ${serviceName}` : '';
+export async function composeCommand(env: Environment, actionCommand: string, workingDir: string, serviceName?: string, configFiles?: string, environmentFiles?: string): Promise<void> {
+  const args = ['compose'];
   
-  // Intelligently detect environment files (Portainer uses stack.env)
-  let envArg = '';
-  
-  // If the container has an explicit environment file label, use it
+  if (configFiles) {
+    args.push('-f', configFiles.split(',')[0]);
+  }
+
   if (environmentFiles) {
-    envArg = `--env-file ${environmentFiles.split(',')[0]} `;
+    args.push('--env-file', environmentFiles.split(',')[0]);
   } else {
-    // Build absolute path string based on platform
     const isWindows = workingDir.includes('\\');
     const separator = isWindows ? '\\' : '/';
     
     try {
       const checkFile = async (filename: string) => {
+        // Still using string fallback for this basic file existence check since we are running shell commands (if exist / if [ -f ])
         const cmd = env.type === 'local' ? `if exist "${filename}" echo yes` : `if [ -f "${filename}" ]; then echo yes; fi`;
-        const { stdout } = await executeCommand(env, cmd, workingDir);
+        const { stdout } = await executeCommand(env, cmd, undefined, workingDir);
         return stdout.trim() === 'yes';
       };
 
       if (await checkFile('docker-compose.env')) {
-        envArg = `--env-file "${workingDir}${separator}docker-compose.env" `;
+        args.push('--env-file', `${workingDir}${separator}docker-compose.env`);
       } else if (await checkFile('.env')) {
-        envArg = `--env-file "${workingDir}${separator}.env" `;
+        args.push('--env-file', `${workingDir}${separator}.env`);
       } else if (await checkFile('stack.env')) {
-        envArg = `--env-file "${workingDir}${separator}stack.env" `;
+        args.push('--env-file', `${workingDir}${separator}stack.env`);
       }
     } catch (e) {
       console.warn("Failed to check for env files", e);
     }
-  } // end of else
-
-  let fileArg = '';
-  if (configFiles) {
-    // Pass explicit compose file to perfectly match original startup!
-    fileArg = `-f ${configFiles.split(',')[0]} `;
   }
 
-  await executeCommand(env, `docker compose ${fileArg}${envArg}${command}${serviceArg}`, workingDir);
+  // actionCommand might be 'up -d' which is multiple args
+  args.push(...actionCommand.split(' '));
+
+  if (serviceName) {
+    args.push(serviceName);
+  }
+
+  await executeCommand(env, 'docker', args, workingDir);
 }
 
 export async function pruneImages(env: Environment): Promise<void> {
   try {
-    await executeCommand(env, `docker image prune -f`);
+    await executeCommand(env, 'docker', ['image', 'prune', '-f']);
   } catch (e) {
     console.warn("Failed to prune images after update", e);
   }
@@ -113,7 +104,7 @@ export async function pruneImages(env: Environment): Promise<void> {
 
 export async function removeImage(env: Environment, image: string): Promise<void> {
   try {
-    await executeCommand(env, `docker rmi -f ${image}`);
+    await executeCommand(env, 'docker', ['rmi', '-f', image]);
   } catch (e) {
     console.warn(`Failed to remove image ${image}`, e);
   }
@@ -121,18 +112,15 @@ export async function removeImage(env: Environment, image: string): Promise<void
 
 export async function getContainerLogs(env: Environment, id: string): Promise<string> {
   try {
-    const { stdout, stderr } = await executeCommand(env, `docker logs --tail 200 ${id}`);
-    // Combine stdout and stderr as docker logs outputs to both
+    const { stdout, stderr } = await executeCommand(env, 'docker', ['logs', '--tail', '200', id]);
     return stdout + (stderr ? '\n' + stderr : '');
   } catch (e: any) {
-    // If it fails (e.g. command fails and throws stderr), return that
     return e.message || String(e);
   }
 }
 
 export async function deployCompose(env: Environment, yamlContent: string, composeFilePath?: string, pruneImages?: boolean): Promise<void> {
   if (composeFilePath) {
-    // Determine working directory from the file path
     const isWindows = composeFilePath.includes('\\');
     const separator = isWindows ? '\\' : '/';
     const dir = composeFilePath.substring(0, composeFilePath.lastIndexOf(separator));
@@ -145,15 +133,14 @@ export async function deployCompose(env: Environment, yamlContent: string, compo
       const fs = await import('fs');
       fs.writeFileSync(composeFilePath, yamlContent);
     } else {
+      // For remote we still need to stream the content into a file using shell
       const delimiter = 'EOF_DOCKER_MANAGER_' + Date.now();
       await executeCommand(env, `cat << '${delimiter}' > "${composeFilePath}"\n${yamlContent}\n${delimiter}`);
     }
     
-    // Deploy using our intelligent composeCommand so it loads stack.env and runs in the right dir!
     await composeCommand(env, 'pull', dir, undefined, composeFilePath);
     await composeCommand(env, 'up -d --remove-orphans', dir, undefined, composeFilePath);
   } else {
-    // Legacy sandbox deployment
     const tempFileName = `docker-compose-temp-${Date.now()}.yml`;
     if (env.type === 'local') {
       const fs = await import('fs');
@@ -161,7 +148,7 @@ export async function deployCompose(env: Environment, yamlContent: string, compo
       const tempPath = path.join(process.cwd(), tempFileName);
       fs.writeFileSync(tempPath, yamlContent);
       try {
-        await executeCommand(env, `docker compose -f ${tempFileName} up -d`, process.cwd());
+        await executeCommand(env, 'docker', ['compose', '-f', tempFileName, 'up', '-d'], process.cwd());
       } finally {
         if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
       }

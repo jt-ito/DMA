@@ -8,7 +8,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Exclude login and auth APIs from protection
-  if (pathname === '/login' || pathname.startsWith('/api/auth') || pathname.startsWith('/api/debug') || pathname.startsWith('/_next') || pathname === '/favicon.ico') {
+  if (pathname === '/login' || pathname.startsWith('/api/auth') || pathname.startsWith('/_next') || pathname === '/favicon.ico') {
     return NextResponse.next();
   }
 

@@ -3,17 +3,17 @@ import { encrypt } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcrypt';
 import rateLimit from '@/lib/rate-limit';
+import crypto from 'crypto';
 
 const limiter = rateLimit({
-  interval: 60 * 1000, // 60 seconds
+  interval: 60 * 1000,
   uniqueTokenPerInterval: 500,
 });
 
 export async function POST(request: Request) {
-  // Rate limiting based on IP
   const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
   try {
-    await limiter.check(5, ip); // 5 login attempts per minute per IP
+    await limiter.check(5, ip); // Protect step-up from brute force
   } catch {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
@@ -26,7 +26,6 @@ export async function POST(request: Request) {
 
   const hash = process.env.ADMIN_PASSWORD_HASH;
   if (!hash) {
-    console.error('CRITICAL: ADMIN_PASSWORD_HASH is not set. Please set it using bcrypt.');
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
   }
 
@@ -35,31 +34,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
   }
 
-  // Create JWT session
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
-  const session = await encrypt({ authenticated: true, role: 'admin', expires });
+  // Generate an independent CSRF token
+  const csrfToken = crypto.randomBytes(32).toString('hex');
 
-  // Save the session in a cookie
+  // Create short-lived step-up session (5 minutes)
+  const expires = new Date(Date.now() + 5 * 60 * 1000);
+  const debugToken = await encrypt({ stepUp: true, csrfToken, expires });
+
   const cookieStore = await cookies();
-  cookieStore.set('session', session, {
+  cookieStore.set('debug_token', debugToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     expires: expires,
-    sameSite: 'lax',
-    path: '/',
+    sameSite: 'strict', // Stricter than main session
+    path: '/api/debug', // Restrict to debug route
   });
 
-  return NextResponse.json({ success: true });
-}
-
-export async function DELETE() {
-  const cookieStore = await cookies();
-  cookieStore.set('session', '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    expires: new Date(0), // expire immediately
-    sameSite: 'lax',
-    path: '/',
-  });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, csrfToken });
 }
