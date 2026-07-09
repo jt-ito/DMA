@@ -39,5 +39,3 @@ To get DMA running locally, make sure you have Docker installed and running on y
    npm run dev
    ```
 4. Open [http://localhost:3000](http://localhost:3000) in your browser and marvel at your containers!
-
----
