@@ -41,5 +41,3 @@ To get DMA running locally, make sure you have Docker installed and running on y
 4. Open [http://localhost:3000](http://localhost:3000) in your browser and marvel at your containers!
 
 ---
-
-*Note: The `dockermanager.exe` binary is strictly kept out of version control, because sharing compiled binaries in a repo is like sharing a toothbrush—just don't do it.*
