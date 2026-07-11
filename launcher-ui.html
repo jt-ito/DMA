@@ -329,6 +329,11 @@
         let isReady = false;
 
         function appendLog(text) {
+            // Intercept control signals delivered as log messages from Electron main
+            if (text.trim() === 'ASK_CLOSE') {
+                document.getElementById('closeModal').classList.add('show');
+                return;
+            }
             const lines = text.split('\n');
             lines.forEach(line => {
                 if (!line.trim()) return;
@@ -347,7 +352,7 @@
                     statusEl.classList.add('ready');
                     btnOpen.classList.add('ready');
                     
-                    // Tell C# to open browser
+                    // Tell host to open browser (works for both C# and Electron)
                     if (window.chrome && window.chrome.webview) {
                         window.chrome.webview.postMessage('OPEN_BROWSER');
                     }

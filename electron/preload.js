@@ -1,6 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose a function to window.chrome.webview.postMessage for compatibility with the C# wrapper
+// Bridge that mimics the C# WebView2 API so launcher-ui.html works unchanged.
+// Messages FROM the main process come as 'log-message' events.
+// Messages TO the main process go via ipcRenderer.send('web-message', ...).
+const messageListeners = [];
+
+ipcRenderer.on('log-message', (event, msg) => {
+  for (const cb of messageListeners) {
+    cb({ data: msg });
+  }
+});
+
 contextBridge.exposeInMainWorld('chrome', {
   webview: {
     postMessage: (message) => {
@@ -8,9 +18,13 @@ contextBridge.exposeInMainWorld('chrome', {
     },
     addEventListener: (event, callback) => {
       if (event === 'message') {
-        ipcRenderer.on('log-message', (e, msg) => {
-          callback({ data: msg });
-        });
+        messageListeners.push(callback);
+      }
+    },
+    removeEventListener: (event, callback) => {
+      if (event === 'message') {
+        const idx = messageListeners.indexOf(callback);
+        if (idx !== -1) messageListeners.splice(idx, 1);
       }
     }
   }

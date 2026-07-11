@@ -1,30 +1,58 @@
-const { app, BrowserWindow, ipcMain, shell, Menu, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, Tray, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 let mainWindow;
 let tray;
 let nodeProcess;
+let serverReady = false;
+
+function getIconPath() {
+  // On Windows use .ico, on Mac/Linux use a PNG from the web-ui favicon
+  if (process.platform === 'win32') {
+    return path.join(__dirname, '..', 'favicon.ico');
+  }
+  // For Mac/Linux, electron-builder will use the icon configured in package.json.
+  // At runtime fall back to the .ico if no PNG is present.
+  const png = path.join(__dirname, '..', 'public', 'favicon.png');
+  if (fs.existsSync(png)) return png;
+  return path.join(__dirname, '..', 'favicon.ico');
+}
 
 function startNodeServer() {
-  // Try to use bundled standalone start.js or the one in the project root
-  const startJsPath = path.join(__dirname, '..', 'start.js');
-  
-  // Actually, wait, when packaged, __dirname is inside resources/app.asar
+  let startJsPath = path.join(__dirname, '..', '.next', 'standalone', 'start.js');
+  let cwd = path.join(__dirname, '..', '.next', 'standalone');
+
+  if (!fs.existsSync(startJsPath)) {
+    startJsPath = path.join(__dirname, '..', 'start.js');
+    cwd = path.join(__dirname, '..');
+  }
+
   nodeProcess = spawn(process.execPath, [startJsPath], {
+    cwd: cwd,
     env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', ELECTRON_RUN_AS_NODE: '1' },
     stdio: 'pipe'
   });
 
-  nodeProcess.stdout.on('data', (data) => {
+  const forward = (data) => {
+    const text = data.toString();
     if (mainWindow) {
-      mainWindow.webContents.send('log-message', data.toString());
+      mainWindow.webContents.send('log-message', text);
     }
-  });
+    // Auto-open browser on first ready signal
+    if (!serverReady && (text.includes('Ready in') || text.includes('localhost:3000') || text.includes('Listening on'))) {
+      serverReady = true;
+      shell.openExternal('http://localhost:3000');
+    }
+  };
 
-  nodeProcess.stderr.on('data', (data) => {
+  nodeProcess.stdout.on('data', forward);
+  nodeProcess.stderr.on('data', forward);
+
+  nodeProcess.on('exit', (code) => {
     if (mainWindow) {
-      mainWindow.webContents.send('log-message', data.toString());
+      mainWindow.webContents.send('log-message', `\n[DMA] Server process exited with code ${code}`);
     }
   });
 }
@@ -33,6 +61,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 500,
+    icon: getIconPath(),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -52,24 +81,25 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
-      mainWindow.hide();
+      // Send ASK_CLOSE to the webview so it can show the modal
+      mainWindow.webContents.send('log-message', 'ASK_CLOSE');
     }
     return false;
   });
 }
 
 function createTray() {
-  let iconPath = path.join(__dirname, '..', 'favicon.ico');
-  
+  const iconPath = getIconPath();
   tray = new Tray(iconPath);
+
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open UI', click: () => mainWindow.show() },
+    { label: 'Open Manager', click: () => mainWindow.show() },
+    { label: 'Open in Browser', click: () => shell.openExternal('http://localhost:3000') },
+    { type: 'separator' },
     { label: 'Exit Server', click: () => {
-      app.isQuitting = true;
-      if (nodeProcess) {
-        nodeProcess.kill();
-      }
-      app.quit();
+        app.isQuitting = true;
+        if (nodeProcess) nodeProcess.kill();
+        app.quit();
     }}
   ]);
   tray.setToolTip('Docker Manager Server');
@@ -91,14 +121,22 @@ app.whenReady().then(() => {
       app.isQuitting = true;
       if (nodeProcess) nodeProcess.kill();
       app.quit();
+    } else if (arg === 'STOP_SERVER') {
+      if (nodeProcess) nodeProcess.kill();
     }
   });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    else mainWindow.show();
   });
 });
 
 app.on('window-all-closed', () => {
-  // Overridden by close handler
+  // Keep running in tray on all platforms
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
+  if (nodeProcess) nodeProcess.kill();
 });

@@ -75,10 +75,16 @@ export async function composeCommand(env: Environment, actionCommand: string, wo
     
     try {
       const checkFile = async (filename: string) => {
-        // Still using string fallback for this basic file existence check since we are running shell commands (if exist / if [ -f ])
-        const cmd = env.type === 'local' ? `if exist "${filename}" echo yes` : `if [ -f "${filename}" ]; then echo yes; fi`;
-        const { stdout } = await executeCommand(env, cmd, undefined, workingDir);
-        return stdout.trim() === 'yes';
+        const fullPath = `${workingDir}${separator}${filename}`;
+        if (env.type === 'local') {
+          // Use Node's own fs — no shell needed and cross-platform
+          const { existsSync } = await import('fs');
+          return existsSync(fullPath);
+        } else {
+          // Remote: use POSIX shell
+          const { stdout } = await executeCommand(env, `if [ -f "${fullPath}" ]; then echo yes; fi`);
+          return stdout.trim() === 'yes';
+        }
       };
 
       if (await checkFile('docker-compose.env')) {
