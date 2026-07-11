@@ -65,13 +65,19 @@ namespace DockerManagerLauncher
                 trayIcon.Visible = false;
             };
 
-            var ctxMenu = new ContextMenu();
-            ctxMenu.MenuItems.Add("Open UI", (s, e) => {
+            var ctxMenu = new ContextMenuStrip();
+            ctxMenu.BackColor = Color.FromArgb(24, 24, 27);
+            ctxMenu.ForeColor = Color.White;
+            ctxMenu.ShowImageMargin = false;
+            
+            var openItem = new ToolStripMenuItem("Open UI");
+            openItem.Click += (s, e) => {
                 this.Show();
                 this.WindowState = FormWindowState.Normal;
                 trayIcon.Visible = false;
-            });
-            ctxMenu.MenuItems.Add("Exit Server", (s, e) => {
+            };
+            var exitItem = new ToolStripMenuItem("Exit Server");
+            exitItem.Click += (s, e) => {
                 trayIcon.Visible = false;
                 if (nodeProcess != null && !nodeProcess.HasExited) {
                     try {
@@ -84,8 +90,11 @@ namespace DockerManagerLauncher
                     } catch { }
                 }
                 Environment.Exit(0);
-            });
-            trayIcon.ContextMenu = ctxMenu;
+            };
+            
+            ctxMenu.Items.Add(openItem);
+            ctxMenu.Items.Add(exitItem);
+            trayIcon.ContextMenuStrip = ctxMenu;
 
             this.Load += LauncherForm_Load;
             this.FormClosing += LauncherForm_FormClosing;
@@ -125,6 +134,12 @@ namespace DockerManagerLauncher
             string msg = e.TryGetWebMessageAsString();
             if (msg == "OPEN_BROWSER") {
                 Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
+            } else if (msg == "MINIMIZE") {
+                this.Hide();
+                trayIcon.Visible = true;
+            } else if (msg == "FORCE_EXIT") {
+                isForceExit = true;
+                this.Close();
             } else if (msg == "STOP_SERVER") {
                 if (nodeProcess != null && !nodeProcess.HasExited)
                 {
@@ -181,6 +196,8 @@ namespace DockerManagerLauncher
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8,
                 WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
             };
             psi.EnvironmentVariables["NO_COLOR"] = "1";
@@ -210,24 +227,17 @@ namespace DockerManagerLauncher
             }
         }
 
+        private bool isForceExit = false;
+
         private void LauncherForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (e.CloseReason == CloseReason.UserClosing && nodeProcess != null && !nodeProcess.HasExited)
+            if (e.CloseReason == CloseReason.UserClosing && nodeProcess != null && !nodeProcess.HasExited && !isForceExit)
             {
-                var result = MessageBox.Show(this, "The server is still running.\n\nDo you want to minimize to the system tray instead of completely exiting?", "Minimize to Tray?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                
-                if (result == DialogResult.Yes)
-                {
-                    e.Cancel = true;
-                    this.Hide();
-                    trayIcon.Visible = true;
-                    return;
+                e.Cancel = true;
+                if (webView.CoreWebView2 != null) {
+                    webView.CoreWebView2.PostWebMessageAsString("ASK_CLOSE");
                 }
-                else if (result == DialogResult.Cancel)
-                {
-                    e.Cancel = true;
-                    return;
-                }
+                return;
             }
 
             if (nodeProcess != null && !nodeProcess.HasExited)

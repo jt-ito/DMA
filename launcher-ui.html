@@ -205,6 +205,77 @@
         .btn-open:active {
             transform: translateY(0);
         }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-box);
+            padding: 24px;
+            width: 420px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            animation: modalIn 0.2s ease;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-content h3 {
+            margin-bottom: 8px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-content p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+            border: none;
+        }
+        
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
@@ -235,6 +306,18 @@
             Open in Browser
         </button>
     </footer>
+
+    <div id="closeModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Server is still running</h3>
+            <p>Do you want to minimize the server to the system tray instead of completely exiting?</p>
+            <div class="modal-actions">
+                <button id="btnCancelClose" class="btn-stop">Cancel</button>
+                <button id="btnForceExit" class="btn-danger">Exit Server</button>
+                <button id="btnMinimizeTray" class="btn-primary">Minimize to Tray</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const logsEl = document.getElementById('logs');
@@ -276,7 +359,11 @@
         if (window.chrome && window.chrome.webview) {
             window.chrome.webview.addEventListener('message', event => {
                 const msg = event.data;
-                appendLog(msg);
+                if (msg === 'ASK_CLOSE') {
+                    document.getElementById('closeModal').classList.add('show');
+                } else {
+                    appendLog(msg);
+                }
             });
             appendLog('Booting Docker Manager Engine...');
         } else {
@@ -296,6 +383,23 @@
         btnStop.addEventListener('click', () => {
             if (window.chrome && window.chrome.webview) {
                 window.chrome.webview.postMessage('STOP_SERVER');
+            }
+        });
+
+        document.getElementById('btnCancelClose').addEventListener('click', () => {
+            document.getElementById('closeModal').classList.remove('show');
+        });
+
+        document.getElementById('btnMinimizeTray').addEventListener('click', () => {
+            document.getElementById('closeModal').classList.remove('show');
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage('MINIMIZE');
+            }
+        });
+
+        document.getElementById('btnForceExit').addEventListener('click', () => {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage('FORCE_EXIT');
             }
         });
     </script>
