@@ -310,7 +310,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
                         {displayState}
                       </span>
                       {c.Status && c.Status.startsWith('Up ') && (
-                        <span className={styles.uptimeText} title={c.Status}>
+                        <span className={styles.uptimeText} title={c.StartedAt ? new Date(c.StartedAt).toLocaleString() : c.Status}>
                           {c.Status.substring(3)}
                         </span>
                       )}

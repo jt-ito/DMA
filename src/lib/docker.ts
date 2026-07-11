@@ -13,6 +13,7 @@ export interface DockerContainer {
   WorkingDir?: string;
   ConfigFiles?: string;
   EnvironmentFiles?: string;
+  StartedAt?: string;
 }
 
 export async function getContainers(env: Environment): Promise<DockerContainer[]> {
@@ -26,17 +27,25 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
   const containerIds = containers.map(c => c.ID);
   
   try {
-    const { stdout: inspectOut } = await executeCommand(env, 'docker', ['inspect', '--format={{json .Config.Labels}}', ...containerIds]);
+    const { stdout: inspectOut } = await executeCommand(env, 'docker', ['inspect', '--format={{json .Config.Labels}}---{{json .State.StartedAt}}', ...containerIds]);
     const inspectLines = inspectOut.trim().split('\n').filter(line => line.length > 0);
     
     for (let i = 0; i < containers.length; i++) {
-       if (inspectLines[i] && inspectLines[i] !== 'null') {
-           const labels = JSON.parse(inspectLines[i]);
-           containers[i].Project = labels['com.docker.compose.project'] || null;
-           containers[i].Service = labels['com.docker.compose.service'] || null;
-           containers[i].WorkingDir = labels['com.docker.compose.project.working_dir'] || null;
-           containers[i].ConfigFiles = labels['com.docker.compose.project.config_files'] || null;
-           containers[i].EnvironmentFiles = labels['com.docker.compose.project.environment_file'] || null;
+       if (inspectLines[i]) {
+           const parts = inspectLines[i].split('---');
+           if (parts[0] && parts[0] !== 'null') {
+               try {
+                   const labels = JSON.parse(parts[0]);
+                   containers[i].Project = labels['com.docker.compose.project'] || null;
+                   containers[i].Service = labels['com.docker.compose.service'] || null;
+                   containers[i].WorkingDir = labels['com.docker.compose.project.working_dir'] || null;
+                   containers[i].ConfigFiles = labels['com.docker.compose.project.config_files'] || null;
+                   containers[i].EnvironmentFiles = labels['com.docker.compose.project.environment_file'] || null;
+               } catch(e) {}
+           }
+           if (parts[1] && parts[1] !== 'null') {
+               try { containers[i].StartedAt = JSON.parse(parts[1]); } catch(e) {}
+           }
        }
     }
   } catch (e) {

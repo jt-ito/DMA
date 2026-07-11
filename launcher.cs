@@ -121,17 +121,20 @@ namespace DockerManagerLauncher
             }
         }
 
-        private void StartNodeServer()
+        private async void StartNodeServer()
         {
-            // Kill existing port 3000 just in case
-            try {
-                Process.Start(new ProcessStartInfo {
-                    FileName = "cmd.exe",
-                    Arguments = "/c npx --yes kill-port 3000",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                }).WaitForExit();
-            } catch { }
+            // Kill existing port 3000 just in case without blocking the UI thread
+            await System.Threading.Tasks.Task.Run(() => {
+                try {
+                    var p = Process.Start(new ProcessStartInfo {
+                        FileName = "cmd.exe",
+                        Arguments = "/c npx --yes kill-port 3000",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    });
+                    p.WaitForExit();
+                } catch { }
+            });
 
             var psi = new ProcessStartInfo
             {
