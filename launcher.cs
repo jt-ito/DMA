@@ -1,76 +1,161 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.Threading;
+using System.Windows.Forms;
+using Microsoft.Win32;
 
-class Launcher
+namespace DockerManagerLauncher
 {
-    static void Main()
+    static class Program
     {
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
-        Console.Title = "Docker Manager Server";
-        Console.WriteLine("========================================");
-        Console.WriteLine("        Starting Docker Manager...      ");
-        Console.WriteLine("========================================");
-        Console.WriteLine("Please wait a moment while the server starts up.");
-        Console.WriteLine("The application will automatically open in your browser.");
-        Console.WriteLine("Keep this window open. Close it to stop the server.");
-        Console.WriteLine();
-        Console.WriteLine("Ensuring port 3000 is clear...");
-
-        try {
-            var killCmd = new ProcessStartInfo {
-                FileName = "cmd.exe",
-                Arguments = "/c npx --yes kill-port 3000",
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-            Process.Start(killCmd).WaitForExit();
-        } catch { }
-
-        var psi = new ProcessStartInfo
+        [STAThread]
+        static void Main()
         {
-            FileName = "cmd.exe",
-            Arguments = "/c npm run dev",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
-        };
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new LauncherForm());
+        }
+    }
 
-        Process npm = new Process { StartInfo = psi };
-        bool opened = false;
-        
-        npm.OutputDataReceived += (s, e) => {
-            if (e.Data != null) {
-                Console.WriteLine(e.Data);
-                // When we see Next.js ready message, open browser
-                if (!opened && (e.Data.Contains("Ready in") || e.Data.Contains("localhost:3000"))) {
-                    opened = true;
-                    Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
+    public class LauncherForm : Form
+    {
+        private Label statusLabel;
+        private Process nodeProcess;
+        private bool openedBrowser = false;
+        private System.Windows.Forms.Timer timeoutTimer;
+        private NotifyIcon trayIcon;
+
+        public LauncherForm()
+        {
+            // Determine Windows theme (Light/Dark)
+            bool isDarkMode = true;
+            try {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")) {
+                    if (key != null) {
+                        object value = key.GetValue("AppsUseLightTheme");
+                        if (value != null && (int)value == 1) isDarkMode = false;
+                    }
                 }
+            } catch { }
+
+            this.Text = "Docker Manager";
+            this.Size = new Size(400, 200);
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            
+            if (isDarkMode) {
+                this.BackColor = Color.FromArgb(24, 24, 27);
+                this.ForeColor = Color.FromArgb(250, 250, 250);
+            } else {
+                this.BackColor = Color.FromArgb(250, 250, 250);
+                this.ForeColor = Color.FromArgb(24, 24, 27);
             }
-        };
+            
+            statusLabel = new Label();
+            statusLabel.Text = "Starting Docker Manager...\nChecking ports and launching server...";
+            statusLabel.Font = new Font("Segoe UI", 11F, FontStyle.Regular);
+            statusLabel.Dock = DockStyle.Fill;
+            statusLabel.TextAlign = ContentAlignment.MiddleCenter;
+            this.Controls.Add(statusLabel);
 
-        npm.ErrorDataReceived += (s, e) => {
-            if (e.Data != null) Console.WriteLine(e.Data);
-        };
-
-        npm.Start();
-        npm.BeginOutputReadLine();
-        npm.BeginErrorReadLine();
-        
-        // Fallback: if we didn't detect the ready string for some reason, open after 5 seconds
-        new Thread(() => {
-            Thread.Sleep(5000);
-            if (!opened) {
-                opened = true;
+            this.Load += LauncherForm_Load;
+            this.FormClosing += LauncherForm_FormClosing;
+            
+            // Set up System Tray Icon
+            trayIcon = new NotifyIcon();
+            trayIcon.Text = "Docker Manager";
+            // Use standard application icon or a default system icon
+            trayIcon.Icon = SystemIcons.Application;
+            
+            ContextMenu trayMenu = new ContextMenu();
+            trayMenu.MenuItems.Add("Open in Browser", (s, e) => {
                 Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
-            }
-        }).Start();
+            });
+            trayMenu.MenuItems.Add("Exit", (s, e) => {
+                this.Close();
+            });
+            trayIcon.ContextMenu = trayMenu;
+            trayIcon.DoubleClick += (s, e) => {
+                Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
+            };
+        }
 
-        npm.WaitForExit();
-        Console.WriteLine("\nServer process has stopped. Press ENTER to close this window.");
-        Console.ReadLine();
+        private void LauncherForm_Load(object sender, EventArgs e)
+        {
+            // Kill existing port 3000 just in case
+            try {
+                Process.Start(new ProcessStartInfo {
+                    FileName = "cmd.exe",
+                    Arguments = "/c npx --yes kill-port 3000",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                }).WaitForExit();
+            } catch { }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "node.exe",
+                Arguments = "start.js",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
+            };
+
+            nodeProcess = new Process { StartInfo = psi };
+            
+            nodeProcess.OutputDataReceived += (s, ev) => {
+                if (ev.Data != null) {
+                    if (!openedBrowser && (ev.Data.Contains("Ready in") || ev.Data.Contains("localhost:3000") || ev.Data.Contains("Listening on"))) {
+                        OpenBrowserAndHide();
+                    }
+                }
+            };
+            
+            nodeProcess.Start();
+            nodeProcess.BeginOutputReadLine();
+            nodeProcess.BeginErrorReadLine();
+
+            timeoutTimer = new System.Windows.Forms.Timer();
+            timeoutTimer.Interval = 5000;
+            timeoutTimer.Tick += (s, ev) => {
+                timeoutTimer.Stop();
+                if (!openedBrowser) {
+                    OpenBrowserAndHide();
+                }
+            };
+            timeoutTimer.Start();
+        }
+
+        private void OpenBrowserAndHide()
+        {
+            if (openedBrowser) return;
+            openedBrowser = true;
+            
+            Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
+            
+            this.Invoke((MethodInvoker)delegate {
+                this.Hide();
+                trayIcon.Visible = true;
+                trayIcon.ShowBalloonTip(3000, "Docker Manager", "Server is running in the background. Right click to exit.", ToolTipIcon.Info);
+            });
+        }
+
+        private void LauncherForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            trayIcon.Visible = false;
+            if (nodeProcess != null && !nodeProcess.HasExited)
+            {
+                Process.Start(new ProcessStartInfo {
+                    FileName = "taskkill",
+                    Arguments = string.Format("/PID {0} /T /F", nodeProcess.Id),
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+            }
+        }
     }
 }

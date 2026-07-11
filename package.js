@@ -18,4 +18,10 @@ if (fs.existsSync(path.join('.next', 'static'))) {
 console.log('Copying start.js...');
 fs.copyFileSync('start.js', path.join('.next', 'standalone', 'start.js'));
 
+console.log('Checking for node.exe in standalone...');
+if (!fs.existsSync(path.join('.next', 'standalone', 'node.exe'))) {
+  console.log('Downloading node.exe (v20.10.0) for packaging...');
+  execSync('curl -s -L -o .next/standalone/node.exe https://nodejs.org/dist/v20.10.0/win-x64/node.exe', { stdio: 'inherit' });
+}
+
 console.log('Build preparation complete.');

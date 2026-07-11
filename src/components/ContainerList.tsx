@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown } from 'lucide-react';
 import { DockerContainer } from '@/lib/docker';
 import styles from './ContainerList.module.css';
 
@@ -27,6 +27,31 @@ export function ContainerList({ envId, isDeploying }: Props) {
   const [logsLoading, setLogsLoading] = useState(false);
   const [selectedContainerName, setSelectedContainerName] = useState<string>('');
   const [updatingAll, setUpdatingAll] = useState(false);
+  const logsContainerRef = useRef<HTMLPreElement>(null);
+
+  const handleExportLogs = () => {
+    const blob = new Blob([currentLogs], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedContainerName}-logs.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const scrollToTop = () => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const scrollToBottom = () => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTo({ top: logsContainerRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
 
   
 
@@ -59,8 +84,15 @@ export function ContainerList({ envId, isDeploying }: Props) {
   }, [envId]);
 
   useEffect(() => {
-    // Revalidate silently in background
+    // Revalidate silently in background immediately
     fetchContainers(false);
+
+    // Refresh periodically to update uptimes
+    const intervalId = setInterval(() => {
+      fetchContainers(false);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(intervalId);
   }, [fetchContainers]);
 
   // When deployment finishes, automatically refresh the list
@@ -355,15 +387,26 @@ export function ContainerList({ envId, isDeploying }: Props) {
           <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h3>Logs: {selectedContainerName}</h3>
-              <button className={styles.closeBtn} onClick={() => setLogsModalOpen(false)}>
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button title="Export Logs" className={styles.actionBtn} onClick={handleExportLogs}>
+                  <Download size={18} />
+                </button>
+                <button title="Scroll to Top" className={styles.actionBtn} onClick={scrollToTop}>
+                  <ArrowUp size={18} />
+                </button>
+                <button title="Scroll to Bottom" className={styles.actionBtn} onClick={scrollToBottom}>
+                  <ArrowDown size={18} />
+                </button>
+                <button className={styles.closeBtn} onClick={() => setLogsModalOpen(false)}>
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             <div className={styles.modalBody}>
               {logsLoading ? (
                 <div className={styles.loading}>Fetching logs...</div>
               ) : (
-                <pre className={styles.logsPre}>{currentLogs || 'No logs available.'}</pre>
+                <pre className={styles.logsPre} ref={logsContainerRef}>{currentLogs || 'No logs available.'}</pre>
               )}
             </div>
           </div>
