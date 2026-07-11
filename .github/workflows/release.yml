@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -27,8 +30,12 @@ jobs:
 
       - name: Build Next.js App
         run: npm run build
+        env:
+          JWT_SECRET: "dummy_secret_for_build_only_1234567890"
+          ADMIN_PASSWORD_HASH: "dummy_hash_for_build_only"
 
       - name: Prepare Standalone Assets
+        shell: bash
         run: |
           node -e "
             const fs = require('fs');
@@ -60,20 +67,37 @@ jobs:
         continue-on-error: true
 
       - name: Build CLI Executable
+        shell: bash
         run: |
           node -e "
             const { execSync } = require('child_process');
             const fs = require('fs');
             if (!fs.existsSync('dist')) fs.mkdirSync('dist');
-            const os = process.platform;
-            let targetName = 'docker-manager-cli-' + os;
-            if (os === 'win32') targetName += '.exe';
+            const osMap = { win32: 'windows', darwin: 'mac', linux: 'linux' };
+            const os = osMap[process.platform] || process.platform;
+            const arch = process.arch;
+            let targetName = 'Docker-Manager-CLI-' + os + '-' + arch;
+            if (process.platform === 'win32') targetName += '.exe';
             execSync('npx caxa -i \".next/standalone\" -o \"dist/' + targetName + '\" -- \"{{caxa}}/node\" \"{{caxa}}/start.js\"', { stdio: 'inherit' });
           "
 
-      - name: Upload Artifacts
+      - name: Upload Artifacts to Action
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-${{ matrix.os }}
           path: dist/*
           retention-days: 1
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.zip
+            dist/Docker-Manager-CLI-*
+          fail_on_unmatched_files: false
+          generate_release_notes: true

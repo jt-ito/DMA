@@ -25,6 +25,7 @@
       "favicon.ico",
       "package.json"
     ],
+    "artifactName": "Docker-Manager-${version}-${os}-${arch}.${ext}",
     "mac": {
       "target": ["dmg", "zip"]
     },
@@ -40,9 +41,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:electron:mac": "electron-builder --mac",
-    "build:electron:linux": "electron-builder --linux",
-    "build:electron:win": "electron-builder --win"
+    "build:electron:mac": "electron-builder --mac --x64 --arm64",
+    "build:electron:linux": "electron-builder --linux --x64",
+    "build:electron:win": "electron-builder --win --x64"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
