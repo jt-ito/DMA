@@ -12,6 +12,21 @@ interface Props {
 
 const globalCache: Record<string, { data?: DockerContainer[], error?: string }> = {};
 
+function formatExactUptime(startedAt: string): string {
+  const diff = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+  if (isNaN(diff) || diff < 0) return 'Unknown';
+  const d = Math.floor(diff / 86400);
+  const h = Math.floor((diff % 86400) / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  const parts = [];
+  if (d > 0) parts.push(`${d} days`);
+  if (h > 0 || d > 0) parts.push(`${h} hours`);
+  if (m > 0 || h > 0 || d > 0) parts.push(`${m} minutes`);
+  parts.push(`${s} seconds`);
+  return parts.join(', ');
+}
+
 export function ContainerList({ envId, isDeploying }: Props) {
   // Initialize state directly from global cache so there is absolutely no flash
   const initialCache = globalCache[envId];
@@ -310,7 +325,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
                         {displayState}
                       </span>
                       {c.Status && c.Status.startsWith('Up ') && (
-                        <span className={styles.uptimeText} title={c.StartedAt ? new Date(c.StartedAt).toLocaleString() : c.Status}>
+                        <span className={styles.uptimeText} title={c.StartedAt ? formatExactUptime(c.StartedAt) : c.Status}>
                           {c.Status.substring(3)}
                         </span>
                       )}
