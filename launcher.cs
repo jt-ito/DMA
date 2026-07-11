@@ -34,7 +34,11 @@ namespace DockerManagerLauncher
             this.Text = "Docker Manager Server";
             this.Size = new Size(800, 500);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Icon = SystemIcons.Application;
+            try {
+                this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            } catch {
+                this.Icon = SystemIcons.Application;
+            }
             this.BackColor = Color.FromArgb(24, 24, 27); // Dark zinc fallback
 
             // Apply dark mode to the native window title bar
@@ -139,6 +143,8 @@ namespace DockerManagerLauncher
                 RedirectStandardError = true,
                 WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
             };
+            psi.EnvironmentVariables["NO_COLOR"] = "1";
+            psi.EnvironmentVariables["FORCE_COLOR"] = "0";
 
             nodeProcess = new Process { StartInfo = psi };
             

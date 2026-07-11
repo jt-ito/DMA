@@ -21,9 +21,18 @@ async function main() {
       fs.copyFileSync('webview2/runtimes/win-x64/native/WebView2Loader.dll', 'WebView2Loader.dll');
     }
 
+    if (fs.existsSync('src/app/favicon.ico')) {
+      fs.copyFileSync('src/app/favicon.ico', 'favicon.ico');
+    }
+
     console.log('Compiling launcher.cs...');
     const cscPath = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe";
-    execSync(`"${cscPath}" /target:winexe /out:launcher.exe /r:Microsoft.Web.WebView2.Core.dll /r:Microsoft.Web.WebView2.WinForms.dll launcher.cs`, { stdio: 'inherit' });
+    let cscCmd = `"${cscPath}" /target:winexe /out:launcher.exe /r:Microsoft.Web.WebView2.Core.dll /r:Microsoft.Web.WebView2.WinForms.dll`;
+    if (fs.existsSync('favicon.ico')) {
+      cscCmd += ` /win32icon:favicon.ico`;
+    }
+    cscCmd += ` launcher.cs`;
+    execSync(cscCmd, { stdio: 'inherit' });
 
     console.log('Building setup installer...');
     await build('setup.iss');

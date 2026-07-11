@@ -277,6 +277,7 @@
                 const msg = event.data;
                 appendLog(msg);
             });
+            appendLog('Booting Docker Manager Engine...');
         } else {
             // Mock for testing in browser
             setTimeout(() => appendLog('Starting Next.js Server...'), 500);
