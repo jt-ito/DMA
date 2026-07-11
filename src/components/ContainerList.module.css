@@ -61,6 +61,13 @@
   gap: 0.25rem;
 }
 
+.uptimeText {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: 0.5rem;
+  font-style: italic;
+}
+
 .idText {
   font-size: 0.8rem;
   color: var(--text-secondary);

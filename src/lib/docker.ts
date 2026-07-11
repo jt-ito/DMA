@@ -112,7 +112,7 @@ export async function removeImage(env: Environment, image: string): Promise<void
 
 export async function getContainerLogs(env: Environment, id: string): Promise<string> {
   try {
-    const { stdout, stderr } = await executeCommand(env, 'docker', ['logs', '--tail', '200', id]);
+    const { stdout, stderr } = await executeCommand(env, 'docker', ['logs', '--timestamps', '--tail', '200', id]);
     return stdout + (stderr ? '\n' + stderr : '');
   } catch (e: any) {
     return e.message || String(e);

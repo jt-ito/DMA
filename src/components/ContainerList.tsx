@@ -273,9 +273,16 @@ export function ContainerList({ envId, isDeploying }: Props) {
                     <span className={styles.idText}>{c.ID.substring(0, 12)}</span>
                   </td>
                   <td>
-                    <span className={`badge ${badgeClass}`}>
-                      {displayState}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span className={`badge ${badgeClass}`}>
+                        {displayState}
+                      </span>
+                      {c.Status && c.Status.startsWith('Up ') && (
+                        <span className={styles.uptimeText} title={c.Status}>
+                          {c.Status.substring(3)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className={styles.imageCell} title={c.Image}>{c.Image}</td>
                   <td>
