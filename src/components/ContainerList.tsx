@@ -368,7 +368,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
                       {isCompose && (
                         <>
                           <button 
-                            title="Update Service" 
+                            title="Update Service (Stops, removes container, prunes image, pulls new image, and starts service)" 
                             className={`${styles.actionBtn} ${styles.primary}`} 
                             onClick={() => handleUpdateCompose(c)} 
                             disabled={isLoading}
