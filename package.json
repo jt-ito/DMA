@@ -2,11 +2,47 @@
   "name": "docker-manager",
   "version": "1.0.2",
   "private": true,
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.dockermanager.app",
+    "productName": "Docker Manager App",
+    "directories": {
+      "output": "dist"
+    },
+    "npmRebuild": false,
+    "files": [
+      "!.git/**/*",
+      "!node_modules/**/*",
+      "!.next/**/*",
+      "!src/**/*",
+      "!webview2/**/*",
+      ".next/standalone/**/*",
+      ".next/static/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "launcher-ui.html",
+      "start.js",
+      "favicon.ico",
+      "package.json"
+    ],
+    "mac": {
+      "target": ["dmg", "zip"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:electron:mac": "electron-builder --mac",
+    "build:electron:linux": "electron-builder --linux",
+    "build:electron:win": "electron-builder --win"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -27,6 +63,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "caxa": "^3.0.1",
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "innosetup-compiler": "^6.3.1",
