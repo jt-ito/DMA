@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -151,14 +152,19 @@ namespace DockerManagerLauncher
 
             nodeProcess = new Process { StartInfo = psi };
             
-            nodeProcess.OutputDataReceived += (s, ev) => {
-                SendLogToUI(ev.Data);
+            nodeProcess.OutputDataReceived += (s, e) => {
+                if (!string.IsNullOrEmpty(e.Data)) {
+                    string cleanStr = Regex.Replace(e.Data, @"\x1B\[[0-9;]*[a-zA-Z]", "");
+                    SendLogToUI(cleanStr);
+                }
+            };
+            nodeProcess.ErrorDataReceived += (s, e) => {
+                if (!string.IsNullOrEmpty(e.Data)) {
+                    string cleanStr = Regex.Replace(e.Data, @"\x1B\[[0-9;]*[a-zA-Z]", "");
+                    SendLogToUI("ERROR: " + cleanStr);
+                }
             };
             
-            nodeProcess.ErrorDataReceived += (s, ev) => {
-                SendLogToUI("ERROR: " + ev.Data);
-            };
-
             try {
                 nodeProcess.Start();
                 nodeProcess.BeginOutputReadLine();
