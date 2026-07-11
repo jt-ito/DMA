@@ -29,6 +29,7 @@ namespace DockerManagerLauncher
 
         private Process nodeProcess;
         private WebView2 webView;
+        private NotifyIcon trayIcon;
 
         public LauncherForm()
         {
@@ -50,6 +51,41 @@ namespace DockerManagerLauncher
             webView = new WebView2();
             webView.Dock = DockStyle.Fill;
             this.Controls.Add(webView);
+
+            trayIcon = new NotifyIcon();
+            try {
+                trayIcon.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            } catch {
+                trayIcon.Icon = SystemIcons.Application;
+            }
+            trayIcon.Text = "Docker Manager Server";
+            trayIcon.DoubleClick += (s, e) => {
+                this.Show();
+                this.WindowState = FormWindowState.Normal;
+                trayIcon.Visible = false;
+            };
+
+            var ctxMenu = new ContextMenu();
+            ctxMenu.MenuItems.Add("Open UI", (s, e) => {
+                this.Show();
+                this.WindowState = FormWindowState.Normal;
+                trayIcon.Visible = false;
+            });
+            ctxMenu.MenuItems.Add("Exit Server", (s, e) => {
+                trayIcon.Visible = false;
+                if (nodeProcess != null && !nodeProcess.HasExited) {
+                    try {
+                        Process.Start(new ProcessStartInfo {
+                            FileName = "taskkill",
+                            Arguments = string.Format("/PID {0} /T /F", nodeProcess.Id),
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        });
+                    } catch { }
+                }
+                Environment.Exit(0);
+            });
+            trayIcon.ContextMenu = ctxMenu;
 
             this.Load += LauncherForm_Load;
             this.FormClosing += LauncherForm_FormClosing;
@@ -176,6 +212,24 @@ namespace DockerManagerLauncher
 
         private void LauncherForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (e.CloseReason == CloseReason.UserClosing && nodeProcess != null && !nodeProcess.HasExited)
+            {
+                var result = MessageBox.Show(this, "The server is still running.\n\nDo you want to minimize to the system tray instead of completely exiting?", "Minimize to Tray?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                
+                if (result == DialogResult.Yes)
+                {
+                    e.Cancel = true;
+                    this.Hide();
+                    trayIcon.Visible = true;
+                    return;
+                }
+                else if (result == DialogResult.Cancel)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
+
             if (nodeProcess != null && !nodeProcess.HasExited)
             {
                 try {
