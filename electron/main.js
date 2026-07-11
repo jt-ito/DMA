@@ -29,10 +29,16 @@ function startNodeServer() {
     cwd = path.join(__dirname, '..');
   }
 
-  nodeProcess = spawn(process.execPath, [startJsPath], {
+  // Quote both the executable and the script path to handle spaces in
+  // the installation/temp directory (e.g. NSIS portable extraction path).
+  const execPath = `"${process.execPath}"`;
+  const scriptPath = `"${startJsPath}"`;
+
+  nodeProcess = spawn(execPath, [scriptPath], {
     cwd: cwd,
     env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', ELECTRON_RUN_AS_NODE: '1' },
-    stdio: 'pipe'
+    stdio: 'pipe',
+    shell: true
   });
 
   const forward = (data) => {

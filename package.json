@@ -5,7 +5,7 @@
   "main": "electron/main.js",
   "build": {
     "appId": "com.dockermanager.app",
-    "productName": "Docker Manager App",
+    "productName": "DockerManagerApp",
     "directories": {
       "output": "dist"
     },
