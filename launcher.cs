@@ -85,7 +85,18 @@ namespace DockerManagerLauncher
             if (msg == "OPEN_BROWSER") {
                 Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
             } else if (msg == "STOP_SERVER") {
-                this.Close();
+                if (nodeProcess != null && !nodeProcess.HasExited)
+                {
+                    try {
+                        Process.Start(new ProcessStartInfo {
+                            FileName = "taskkill",
+                            Arguments = string.Format("/PID {0} /T /F", nodeProcess.Id),
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        });
+                        SendLogToUI("\n=== Server Stopped ===");
+                    } catch { }
+                }
             }
         }
 
