@@ -1,9 +1,11 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms;
-using Microsoft.Win32;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
 
 namespace DockerManagerLauncher
 {
@@ -21,117 +23,82 @@ namespace DockerManagerLauncher
     public class LauncherForm : Form
     {
         private Process nodeProcess;
-        private RichTextBox logBox;
-        private Button openBrowserBtn;
-        private Button stopServerBtn;
-        private bool isDarkMode = true;
+        private WebView2 webView;
 
         public LauncherForm()
         {
-            // Determine Windows theme (Light/Dark)
-            try {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")) {
-                    if (key != null) {
-                        object value = key.GetValue("AppsUseLightTheme");
-                        if (value != null && (int)value == 1) isDarkMode = false;
-                    }
-                }
-            } catch { }
-
             this.Text = "Docker Manager Server";
             this.Size = new Size(800, 500);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Icon = SystemIcons.Application;
+            this.BackColor = Color.FromArgb(24, 24, 27); // Dark zinc fallback
             
-            Color bgColor = isDarkMode ? Color.FromArgb(24, 24, 27) : Color.FromArgb(250, 250, 250);
-            Color fgColor = isDarkMode ? Color.FromArgb(250, 250, 250) : Color.FromArgb(24, 24, 27);
-            Color logBgColor = isDarkMode ? Color.FromArgb(10, 10, 10) : Color.White;
-            Color logFgColor = isDarkMode ? Color.FromArgb(0, 255, 0) : Color.Black;
-            Color btnBgColor = isDarkMode ? Color.FromArgb(63, 63, 70) : Color.FromArgb(228, 228, 231);
-
-            this.BackColor = bgColor;
-            this.ForeColor = fgColor;
-            
-            TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
-            layout.RowCount = 2;
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
-            this.Controls.Add(layout);
-
-            logBox = new RichTextBox();
-            logBox.Dock = DockStyle.Fill;
-            logBox.ReadOnly = true;
-            logBox.BackColor = logBgColor;
-            logBox.ForeColor = logFgColor;
-            logBox.Font = new Font("Consolas", 10F, FontStyle.Regular);
-            logBox.BorderStyle = BorderStyle.None;
-            logBox.Margin = new Padding(10);
-            layout.Controls.Add(logBox, 0, 0);
-
-            FlowLayoutPanel btnPanel = new FlowLayoutPanel();
-            btnPanel.Dock = DockStyle.Fill;
-            btnPanel.FlowDirection = FlowDirection.RightToLeft;
-            btnPanel.Padding = new Padding(10);
-            layout.Controls.Add(btnPanel, 0, 1);
-
-            openBrowserBtn = new Button();
-            openBrowserBtn.Text = "Open in Browser";
-            openBrowserBtn.Size = new Size(130, 30);
-            openBrowserBtn.FlatStyle = FlatStyle.Flat;
-            openBrowserBtn.BackColor = Color.FromArgb(37, 99, 235); // Blue
-            openBrowserBtn.ForeColor = Color.White;
-            openBrowserBtn.Cursor = Cursors.Hand;
-            openBrowserBtn.Click += (s, e) => {
-                Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
-            };
-            btnPanel.Controls.Add(openBrowserBtn);
-
-            stopServerBtn = new Button();
-            stopServerBtn.Text = "Stop Server";
-            stopServerBtn.Size = new Size(100, 30);
-            stopServerBtn.FlatStyle = FlatStyle.Flat;
-            stopServerBtn.BackColor = btnBgColor;
-            stopServerBtn.ForeColor = fgColor;
-            stopServerBtn.Cursor = Cursors.Hand;
-            stopServerBtn.Click += (s, e) => {
-                this.Close();
-            };
-            btnPanel.Controls.Add(stopServerBtn);
+            webView = new WebView2();
+            webView.Dock = DockStyle.Fill;
+            this.Controls.Add(webView);
 
             this.Load += LauncherForm_Load;
             this.FormClosing += LauncherForm_FormClosing;
         }
 
-        private void AppendLog(string text)
+        private async void LauncherForm_Load(object sender, EventArgs e)
+        {
+            try {
+                // Initialize WebView2
+                string userDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DockerManagerLauncher");
+                var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
+                await webView.EnsureCoreWebView2Async(env);
+                
+                // Disable dev tools and context menu for a clean app feel
+                webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+                
+                // Listen for messages from the UI (Open Browser, Stop Server)
+                webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+
+                // Load the modern HTML UI
+                string uiPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "launcher-ui.html");
+                if (File.Exists(uiPath)) {
+                    webView.CoreWebView2.Navigate("file:///" + uiPath.Replace("\\", "/"));
+                } else {
+                    MessageBox.Show("Could not find launcher-ui.html!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                
+                StartNodeServer();
+            } catch (Exception ex) {
+                MessageBox.Show("WebView2 Initialization Failed: " + ex.Message + "\n\nPlease ensure Microsoft Edge WebView2 Runtime is installed.", "Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Application.Exit();
+            }
+        }
+
+        private void CoreWebView2_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            string msg = e.TryGetWebMessageAsString();
+            if (msg == "OPEN_BROWSER") {
+                Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
+            } else if (msg == "STOP_SERVER") {
+                this.Close();
+            }
+        }
+
+        private void SendLogToUI(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
             
             if (this.InvokeRequired)
             {
-                this.BeginInvoke(new Action<string>(AppendLog), text);
+                this.BeginInvoke(new Action<string>(SendLogToUI), text);
                 return;
             }
 
-            logBox.AppendText(text + Environment.NewLine);
-            logBox.SelectionStart = logBox.Text.Length;
-            logBox.ScrollToCaret();
-
-            // Auto-open browser on first ready
-            if (text.Contains("Ready in") || text.Contains("localhost:3000") || text.Contains("Listening on")) {
-                if (!autoOpened) {
-                    autoOpened = true;
-                    Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
-                }
+            if (webView.CoreWebView2 != null) {
+                // Sanitize text for JSON string
+                string safeText = text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "");
+                webView.CoreWebView2.PostWebMessageAsString(text);
             }
         }
-        
-        private bool autoOpened = false;
 
-        private void LauncherForm_Load(object sender, EventArgs e)
+        private void StartNodeServer()
         {
-            AppendLog("Starting Docker Manager...");
-            
             // Kill existing port 3000 just in case
             try {
                 Process.Start(new ProcessStartInfo {
@@ -141,8 +108,6 @@ namespace DockerManagerLauncher
                     UseShellExecute = false
                 }).WaitForExit();
             } catch { }
-
-            AppendLog("Port 3000 cleared. Launching Node server...");
 
             var psi = new ProcessStartInfo
             {
@@ -158,11 +123,11 @@ namespace DockerManagerLauncher
             nodeProcess = new Process { StartInfo = psi };
             
             nodeProcess.OutputDataReceived += (s, ev) => {
-                AppendLog(ev.Data);
+                SendLogToUI(ev.Data);
             };
             
             nodeProcess.ErrorDataReceived += (s, ev) => {
-                AppendLog("ERROR: " + ev.Data);
+                SendLogToUI("ERROR: " + ev.Data);
             };
 
             try {
@@ -170,7 +135,7 @@ namespace DockerManagerLauncher
                 nodeProcess.BeginOutputReadLine();
                 nodeProcess.BeginErrorReadLine();
             } catch (Exception ex) {
-                AppendLog("Failed to start server: " + ex.Message);
+                SendLogToUI("Failed to start server: " + ex.Message);
             }
         }
 

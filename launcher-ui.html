@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Manager Launcher</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-color: #f4f4f5;
+            --surface-color: #ffffff;
+            --text-main: #18181b;
+            --text-muted: #71717a;
+            --border-color: #e4e4e7;
+            --accent-color: #2563eb;
+            --accent-hover: #1d4ed8;
+            --danger-color: #ef4444;
+            --danger-hover: #dc2626;
+            --log-bg: #18181b;
+            --log-text: #10b981;
+            
+            --radius: 0px; /* Angular sharp edges */
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #09090b;
+                --surface-color: #18181b;
+                --text-main: #fafafa;
+                --text-muted: #a1a1aa;
+                --border-color: #27272a;
+                --accent-color: #3b82f6;
+                --accent-hover: #60a5fa;
+                --danger-color: #ef4444;
+                --danger-hover: #f87171;
+                --log-bg: #000000;
+                --log-text: #10b981;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        header {
+            padding: 20px 24px;
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            background-color: var(--accent-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: var(--radius);
+        }
+
+        .brand-text h1 {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-text p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            background-color: var(--border-color);
+            color: var(--text-muted);
+            border-radius: var(--radius);
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+
+        .status-badge.ready {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 16px;
+        }
+
+        .log-container {
+            flex: 1;
+            background-color: var(--log-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        #logs {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--log-text);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-line {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 0 20px 20px 20px;
+        }
+
+        button {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-stop {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        .btn-stop:hover {
+            border-color: var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        .btn-open {
+            background-color: var(--accent-color);
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .btn-open.ready {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .btn-open:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.23);
+        }
+
+        .btn-open:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <div class="brand-icon">DM</div>
+            <div class="brand-text">
+                <h1>Docker Manager</h1>
+                <p>Server Launcher</p>
+            </div>
+        </div>
+        <div id="status" class="status-badge">Starting...</div>
+    </header>
+    
+    <main>
+        <div class="log-container" id="logContainer">
+            <div id="logs"></div>
+        </div>
+    </main>
+
+    <footer>
+        <button id="btnStop" class="btn-stop">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"><rect x="3" y="3" width="18" height="18"></rect></svg>
+            Stop Server
+        </button>
+        <button id="btnOpen" class="btn-open">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            Open in Browser
+        </button>
+    </footer>
+
+    <script>
+        const logsEl = document.getElementById('logs');
+        const logContainer = document.getElementById('logContainer');
+        const statusEl = document.getElementById('status');
+        const btnOpen = document.getElementById('btnOpen');
+        const btnStop = document.getElementById('btnStop');
+
+        let isReady = false;
+
+        function appendLog(text) {
+            const lines = text.split('\n');
+            lines.forEach(line => {
+                if (!line.trim()) return;
+                const div = document.createElement('div');
+                div.className = 'log-line';
+                div.textContent = line;
+                logsEl.appendChild(div);
+
+                // Auto scroll
+                logContainer.scrollTop = logContainer.scrollHeight;
+
+                // Check for ready state
+                if (!isReady && (line.includes('Ready in') || line.includes('localhost:3000') || line.includes('Listening on'))) {
+                    isReady = true;
+                    statusEl.textContent = 'Ready';
+                    statusEl.classList.add('ready');
+                    btnOpen.classList.add('ready');
+                    
+                    // Tell C# to open browser
+                    if (window.chrome && window.chrome.webview) {
+                        window.chrome.webview.postMessage('OPEN_BROWSER');
+                    }
+                }
+            });
+        }
+
+        // Listen for messages from C#
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.addEventListener('message', event => {
+                const msg = event.data;
+                appendLog(msg);
+            });
+        } else {
+            // Mock for testing in browser
+            setTimeout(() => appendLog('Starting Next.js Server...'), 500);
+            setTimeout(() => appendLog('▲ Next.js 16.2.9 (Turbopack)'), 1000);
+            setTimeout(() => appendLog('- Local:         http://localhost:3000'), 1200);
+            setTimeout(() => appendLog('✓ Ready in 720ms'), 1500);
+        }
+
+        btnOpen.addEventListener('click', () => {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage('OPEN_BROWSER');
+            }
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage('STOP_SERVER');
+            }
+        });
+    </script>
+</body>
+</html>
