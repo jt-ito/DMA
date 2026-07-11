@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -22,6 +23,9 @@ namespace DockerManagerLauncher
 
     public class LauncherForm : Form
     {
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
         private Process nodeProcess;
         private WebView2 webView;
 
@@ -32,6 +36,11 @@ namespace DockerManagerLauncher
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Icon = SystemIcons.Application;
             this.BackColor = Color.FromArgb(24, 24, 27); // Dark zinc fallback
+
+            // Apply dark mode to the native window title bar
+            int dark = 1;
+            DwmSetWindowAttribute(this.Handle, 20, ref dark, sizeof(int)); // Windows 11 and later Win10
+            DwmSetWindowAttribute(this.Handle, 19, ref dark, sizeof(int)); // Older Win10
             
             webView = new WebView2();
             webView.Dock = DockStyle.Fill;

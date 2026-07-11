@@ -20,7 +20,8 @@
             --log-bg: #18181b;
             --log-text: #10b981;
             
-            --radius: 0px; /* Angular sharp edges */
+            --radius-box: 12px;
+            --radius-btn: 9999px;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -81,7 +82,7 @@
             justify-content: center;
             font-weight: bold;
             font-size: 18px;
-            border-radius: var(--radius);
+            border-radius: var(--radius-btn);
         }
 
         .brand-text h1 {
@@ -103,7 +104,7 @@
             padding: 4px 8px;
             background-color: var(--border-color);
             color: var(--text-muted);
-            border-radius: var(--radius);
+            border-radius: var(--radius-btn);
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
         }
@@ -125,7 +126,7 @@
             flex: 1;
             background-color: var(--log-bg);
             border: 1px solid var(--border-color);
-            border-radius: var(--radius);
+            border-radius: var(--radius-box);
             padding: 16px;
             overflow-y: auto;
             position: relative;
@@ -162,7 +163,7 @@
             font-weight: 600;
             padding: 10px 20px;
             border: none;
-            border-radius: var(--radius);
+            border-radius: var(--radius-btn);
             cursor: pointer;
             transition: all 0.2s ease;
             display: flex;
