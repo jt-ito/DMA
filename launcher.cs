@@ -175,16 +175,38 @@ namespace DockerManagerLauncher
 
         private async void StartNodeServer()
         {
-            // Kill existing port 3000 just in case without blocking the UI thread
+            // Kill existing port 3000 instantly using native Windows commands without blocking the UI thread
             await System.Threading.Tasks.Task.Run(() => {
                 try {
                     var p = Process.Start(new ProcessStartInfo {
                         FileName = "cmd.exe",
-                        Arguments = "/c npx --yes kill-port 3000",
+                        Arguments = "/c netstat -ano | findstr :3000",
                         CreateNoWindow = true,
+                        RedirectStandardOutput = true,
                         UseShellExecute = false
                     });
+                    string output = p.StandardOutput.ReadToEnd();
                     p.WaitForExit();
+
+                    var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length > 0 && parts[1].EndsWith(":3000"))
+                        {
+                            string pidStr = parts[parts.Length - 1];
+                            int pid;
+                            if (int.TryParse(pidStr, out pid) && pid > 0)
+                            {
+                                Process.Start(new ProcessStartInfo {
+                                    FileName = "taskkill",
+                                    Arguments = string.Format("/PID {0} /T /F", pid),
+                                    CreateNoWindow = true,
+                                    UseShellExecute = false
+                                }).WaitForExit();
+                            }
+                        }
+                    }
                 } catch { }
             });
 
