@@ -20,16 +20,15 @@ namespace DockerManagerLauncher
 
     public class LauncherForm : Form
     {
-        private Label statusLabel;
         private Process nodeProcess;
-        private bool openedBrowser = false;
-        private System.Windows.Forms.Timer timeoutTimer;
-        private NotifyIcon trayIcon;
+        private RichTextBox logBox;
+        private Button openBrowserBtn;
+        private Button stopServerBtn;
+        private bool isDarkMode = true;
 
         public LauncherForm()
         {
             // Determine Windows theme (Light/Dark)
-            bool isDarkMode = true;
             try {
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")) {
                     if (key != null) {
@@ -39,51 +38,100 @@ namespace DockerManagerLauncher
                 }
             } catch { }
 
-            this.Text = "Docker Manager";
-            this.Size = new Size(400, 200);
+            this.Text = "Docker Manager Server";
+            this.Size = new Size(800, 500);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
+            this.Icon = SystemIcons.Application;
             
-            if (isDarkMode) {
-                this.BackColor = Color.FromArgb(24, 24, 27);
-                this.ForeColor = Color.FromArgb(250, 250, 250);
-            } else {
-                this.BackColor = Color.FromArgb(250, 250, 250);
-                this.ForeColor = Color.FromArgb(24, 24, 27);
-            }
+            Color bgColor = isDarkMode ? Color.FromArgb(24, 24, 27) : Color.FromArgb(250, 250, 250);
+            Color fgColor = isDarkMode ? Color.FromArgb(250, 250, 250) : Color.FromArgb(24, 24, 27);
+            Color logBgColor = isDarkMode ? Color.FromArgb(10, 10, 10) : Color.White;
+            Color logFgColor = isDarkMode ? Color.FromArgb(0, 255, 0) : Color.Black;
+            Color btnBgColor = isDarkMode ? Color.FromArgb(63, 63, 70) : Color.FromArgb(228, 228, 231);
+
+            this.BackColor = bgColor;
+            this.ForeColor = fgColor;
             
-            statusLabel = new Label();
-            statusLabel.Text = "Starting Docker Manager...\nChecking ports and launching server...";
-            statusLabel.Font = new Font("Segoe UI", 11F, FontStyle.Regular);
-            statusLabel.Dock = DockStyle.Fill;
-            statusLabel.TextAlign = ContentAlignment.MiddleCenter;
-            this.Controls.Add(statusLabel);
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.RowCount = 2;
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
+            this.Controls.Add(layout);
+
+            logBox = new RichTextBox();
+            logBox.Dock = DockStyle.Fill;
+            logBox.ReadOnly = true;
+            logBox.BackColor = logBgColor;
+            logBox.ForeColor = logFgColor;
+            logBox.Font = new Font("Consolas", 10F, FontStyle.Regular);
+            logBox.BorderStyle = BorderStyle.None;
+            logBox.Margin = new Padding(10);
+            layout.Controls.Add(logBox, 0, 0);
+
+            FlowLayoutPanel btnPanel = new FlowLayoutPanel();
+            btnPanel.Dock = DockStyle.Fill;
+            btnPanel.FlowDirection = FlowDirection.RightToLeft;
+            btnPanel.Padding = new Padding(10);
+            layout.Controls.Add(btnPanel, 0, 1);
+
+            openBrowserBtn = new Button();
+            openBrowserBtn.Text = "Open in Browser";
+            openBrowserBtn.Size = new Size(130, 30);
+            openBrowserBtn.FlatStyle = FlatStyle.Flat;
+            openBrowserBtn.BackColor = Color.FromArgb(37, 99, 235); // Blue
+            openBrowserBtn.ForeColor = Color.White;
+            openBrowserBtn.Cursor = Cursors.Hand;
+            openBrowserBtn.Click += (s, e) => {
+                Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
+            };
+            btnPanel.Controls.Add(openBrowserBtn);
+
+            stopServerBtn = new Button();
+            stopServerBtn.Text = "Stop Server";
+            stopServerBtn.Size = new Size(100, 30);
+            stopServerBtn.FlatStyle = FlatStyle.Flat;
+            stopServerBtn.BackColor = btnBgColor;
+            stopServerBtn.ForeColor = fgColor;
+            stopServerBtn.Cursor = Cursors.Hand;
+            stopServerBtn.Click += (s, e) => {
+                this.Close();
+            };
+            btnPanel.Controls.Add(stopServerBtn);
 
             this.Load += LauncherForm_Load;
             this.FormClosing += LauncherForm_FormClosing;
-            
-            // Set up System Tray Icon
-            trayIcon = new NotifyIcon();
-            trayIcon.Text = "Docker Manager";
-            // Use standard application icon or a default system icon
-            trayIcon.Icon = SystemIcons.Application;
-            
-            ContextMenu trayMenu = new ContextMenu();
-            trayMenu.MenuItems.Add("Open in Browser", (s, e) => {
-                Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
-            });
-            trayMenu.MenuItems.Add("Exit", (s, e) => {
-                this.Close();
-            });
-            trayIcon.ContextMenu = trayMenu;
-            trayIcon.DoubleClick += (s, e) => {
-                Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
-            };
         }
+
+        private void AppendLog(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action<string>(AppendLog), text);
+                return;
+            }
+
+            logBox.AppendText(text + Environment.NewLine);
+            logBox.SelectionStart = logBox.Text.Length;
+            logBox.ScrollToCaret();
+
+            // Auto-open browser on first ready
+            if (text.Contains("Ready in") || text.Contains("localhost:3000") || text.Contains("Listening on")) {
+                if (!autoOpened) {
+                    autoOpened = true;
+                    Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
+                }
+            }
+        }
+        
+        private bool autoOpened = false;
 
         private void LauncherForm_Load(object sender, EventArgs e)
         {
+            AppendLog("Starting Docker Manager...");
+            
             // Kill existing port 3000 just in case
             try {
                 Process.Start(new ProcessStartInfo {
@@ -93,6 +141,8 @@ namespace DockerManagerLauncher
                     UseShellExecute = false
                 }).WaitForExit();
             } catch { }
+
+            AppendLog("Port 3000 cleared. Launching Node server...");
 
             var psi = new ProcessStartInfo
             {
@@ -108,53 +158,34 @@ namespace DockerManagerLauncher
             nodeProcess = new Process { StartInfo = psi };
             
             nodeProcess.OutputDataReceived += (s, ev) => {
-                if (ev.Data != null) {
-                    if (!openedBrowser && (ev.Data.Contains("Ready in") || ev.Data.Contains("localhost:3000") || ev.Data.Contains("Listening on"))) {
-                        OpenBrowserAndHide();
-                    }
-                }
+                AppendLog(ev.Data);
             };
             
-            nodeProcess.Start();
-            nodeProcess.BeginOutputReadLine();
-            nodeProcess.BeginErrorReadLine();
-
-            timeoutTimer = new System.Windows.Forms.Timer();
-            timeoutTimer.Interval = 5000;
-            timeoutTimer.Tick += (s, ev) => {
-                timeoutTimer.Stop();
-                if (!openedBrowser) {
-                    OpenBrowserAndHide();
-                }
+            nodeProcess.ErrorDataReceived += (s, ev) => {
+                AppendLog("ERROR: " + ev.Data);
             };
-            timeoutTimer.Start();
-        }
 
-        private void OpenBrowserAndHide()
-        {
-            if (openedBrowser) return;
-            openedBrowser = true;
-            
-            Process.Start(new ProcessStartInfo("cmd", "/c start http://localhost:3000") { CreateNoWindow = true, UseShellExecute = false });
-            
-            this.Invoke((MethodInvoker)delegate {
-                this.Hide();
-                trayIcon.Visible = true;
-                trayIcon.ShowBalloonTip(3000, "Docker Manager", "Server is running in the background. Right click to exit.", ToolTipIcon.Info);
-            });
+            try {
+                nodeProcess.Start();
+                nodeProcess.BeginOutputReadLine();
+                nodeProcess.BeginErrorReadLine();
+            } catch (Exception ex) {
+                AppendLog("Failed to start server: " + ex.Message);
+            }
         }
 
         private void LauncherForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            trayIcon.Visible = false;
             if (nodeProcess != null && !nodeProcess.HasExited)
             {
-                Process.Start(new ProcessStartInfo {
-                    FileName = "taskkill",
-                    Arguments = string.Format("/PID {0} /T /F", nodeProcess.Id),
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                });
+                try {
+                    Process.Start(new ProcessStartInfo {
+                        FileName = "taskkill",
+                        Arguments = string.Format("/PID {0} /T /F", nodeProcess.Id),
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    });
+                } catch { }
             }
         }
     }

@@ -1,6 +1,6 @@
 [Setup]
 AppName=Docker Manager App
-AppVersion=1.0.2
+AppVersion=1.0.3
 DefaultDirName={tmp}\Docker Manager Portable
 DisableProgramGroupPage=yes
 DisableDirPage=yes
