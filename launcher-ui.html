@@ -351,18 +351,13 @@
                     statusEl.textContent = 'Ready';
                     statusEl.classList.add('ready');
                     btnOpen.classList.add('ready');
-                    
-                    // Tell host to open browser (works for both C# and Electron)
-                    if (window.chrome && window.chrome.webview) {
-                        window.chrome.webview.postMessage('OPEN_BROWSER');
-                    }
                 }
             });
         }
 
-        // Listen for messages from C#
-        if (window.chrome && window.chrome.webview) {
-            window.chrome.webview.addEventListener('message', event => {
+        // Listen for messages from host
+        if (window.dmaAPI) {
+            window.dmaAPI.addEventListener('message', event => {
                 const msg = event.data;
                 if (msg === 'ASK_CLOSE') {
                     document.getElementById('closeModal').classList.add('show');
@@ -380,14 +375,14 @@
         }
 
         btnOpen.addEventListener('click', () => {
-            if (window.chrome && window.chrome.webview) {
-                window.chrome.webview.postMessage('OPEN_BROWSER');
+            if (window.dmaAPI) {
+                window.dmaAPI.postMessage('OPEN_BROWSER');
             }
         });
 
         btnStop.addEventListener('click', () => {
-            if (window.chrome && window.chrome.webview) {
-                window.chrome.webview.postMessage('STOP_SERVER');
+            if (window.dmaAPI) {
+                window.dmaAPI.postMessage('STOP_SERVER');
             }
         });
 
@@ -397,14 +392,14 @@
 
         document.getElementById('btnMinimizeTray').addEventListener('click', () => {
             document.getElementById('closeModal').classList.remove('show');
-            if (window.chrome && window.chrome.webview) {
-                window.chrome.webview.postMessage('MINIMIZE');
+            if (window.dmaAPI) {
+                window.dmaAPI.postMessage('MINIMIZE');
             }
         });
 
         document.getElementById('btnForceExit').addEventListener('click', () => {
-            if (window.chrome && window.chrome.webview) {
-                window.chrome.webview.postMessage('FORCE_EXIT');
+            if (window.dmaAPI) {
+                window.dmaAPI.postMessage('FORCE_EXIT');
             }
         });
     </script>

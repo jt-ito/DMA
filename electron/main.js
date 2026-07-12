@@ -46,10 +46,8 @@ function startNodeServer() {
     if (mainWindow) {
       mainWindow.webContents.send('log-message', text);
     }
-    // Auto-open browser on first ready signal
     if (!serverReady && (text.includes('Ready in') || text.includes('localhost:3000') || text.includes('Listening on'))) {
       serverReady = true;
-      shell.openExternal('http://localhost:3000');
     }
   };
 

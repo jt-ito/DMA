@@ -11,21 +11,19 @@ ipcRenderer.on('log-message', (event, msg) => {
   }
 });
 
-contextBridge.exposeInMainWorld('chrome', {
-  webview: {
-    postMessage: (message) => {
-      ipcRenderer.send('web-message', message);
-    },
-    addEventListener: (event, callback) => {
-      if (event === 'message') {
-        messageListeners.push(callback);
-      }
-    },
-    removeEventListener: (event, callback) => {
-      if (event === 'message') {
-        const idx = messageListeners.indexOf(callback);
-        if (idx !== -1) messageListeners.splice(idx, 1);
-      }
+contextBridge.exposeInMainWorld('dmaAPI', {
+  postMessage: (message) => {
+    ipcRenderer.send('web-message', message);
+  },
+  addEventListener: (event, callback) => {
+    if (event === 'message') {
+      messageListeners.push(callback);
+    }
+  },
+  removeEventListener: (event, callback) => {
+    if (event === 'message') {
+      const idx = messageListeners.indexOf(callback);
+      if (idx !== -1) messageListeners.splice(idx, 1);
     }
   }
 });
