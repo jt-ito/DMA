@@ -17,10 +17,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
@@ -98,6 +98,7 @@ jobs:
             dist/*.AppImage
             dist/*.deb
             dist/*.zip
-            dist/Docker-Manager-CLI-*
+            dist/Docker-Manager-CLI-mac-*
+            dist/Docker-Manager-CLI-linux-*
           fail_on_unmatched_files: false
           generate_release_notes: true
