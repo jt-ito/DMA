@@ -334,6 +334,15 @@
                 document.getElementById('closeModal').classList.add('show');
                 return;
             }
+            if (text.trim() === 'SERVER_STOPPED') {
+                isReady = false;
+                statusEl.textContent = 'Stopped';
+                statusEl.classList.remove('ready');
+                btnOpen.classList.remove('ready');
+                btnStop.style.opacity = '0.5';
+                btnStop.style.pointerEvents = 'none';
+                return;
+            }
             const lines = text.split('\n');
             lines.forEach(line => {
                 if (!line.trim()) return;

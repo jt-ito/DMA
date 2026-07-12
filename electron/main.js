@@ -7,6 +7,7 @@ let mainWindow;
 let tray;
 let nodeProcess;
 let serverReady = false;
+let serverRunning = false;
 
 function getIconPath() {
   if (process.platform === 'win32') {
@@ -34,6 +35,7 @@ function startNodeServer() {
     cwd = cwd.replace('app.asar', 'app.asar.unpacked');
   }
 
+  serverRunning = true;
   nodeProcess = spawn(process.execPath, [startJsPath], {
     cwd: cwd,
     env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', ELECTRON_RUN_AS_NODE: '1' },
@@ -54,10 +56,13 @@ function startNodeServer() {
   nodeProcess.stdout.on('data', forward);
   nodeProcess.stderr.on('data', forward);
 
-  nodeProcess.on('exit', (code) => {
-    try { fs.appendFileSync(path.join(app.getPath('userData'), 'dma-debug.log'), `[DMA] Server process exited with code ${code}\\n`); } catch (e) {}
+  nodeProcess.on('exit', (code, signal) => {
+    serverRunning = false;
+    const reason = code !== null ? `code ${code}` : `signal ${signal || 'killed'}`;
+    try { fs.appendFileSync(path.join(app.getPath('userData'), 'dma-debug.log'), `[DMA] Server process exited with ${reason}\\n`); } catch (e) {}
     if (mainWindow) {
-      mainWindow.webContents.send('log-message', `\\n[DMA] Server process exited with code ${code}`);
+      mainWindow.webContents.send('log-message', `\\n[DMA] Server process exited with ${reason}`);
+      mainWindow.webContents.send('log-message', 'SERVER_STOPPED');
     }
   });
 }
@@ -85,9 +90,14 @@ function createWindow() {
 
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
-      event.preventDefault();
-      // Send ASK_CLOSE to the webview so it can show the modal
-      mainWindow.webContents.send('log-message', 'ASK_CLOSE');
+      if (serverRunning) {
+        event.preventDefault();
+        // Send ASK_CLOSE to the webview so it can show the modal
+        mainWindow.webContents.send('log-message', 'ASK_CLOSE');
+      } else {
+        app.isQuitting = true;
+        app.quit();
+      }
     }
     return false;
   });
