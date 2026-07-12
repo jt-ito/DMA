@@ -9,14 +9,12 @@ let nodeProcess;
 let serverReady = false;
 
 function getIconPath() {
-  // On Windows use .ico, on Mac/Linux use a PNG from the web-ui favicon
   if (process.platform === 'win32') {
-    return path.join(__dirname, '..', 'favicon.ico');
+    const icoPath = path.join(__dirname, '..', 'favicon.ico');
+    if (fs.existsSync(icoPath)) return icoPath;
   }
-  // For Mac/Linux, electron-builder will use the icon configured in package.json.
-  // At runtime fall back to the .ico if no PNG is present.
-  const png = path.join(__dirname, '..', 'public', 'favicon.png');
-  if (fs.existsSync(png)) return png;
+  const pngPath = path.join(__dirname, '..', 'public', 'icon.png');
+  if (fs.existsSync(pngPath)) return pngPath;
   return path.join(__dirname, '..', 'favicon.ico');
 }
 
@@ -29,20 +27,22 @@ function startNodeServer() {
     cwd = path.join(__dirname, '..');
   }
 
-  // Quote both the executable and the script path to handle spaces in
-  // the installation/temp directory (e.g. NSIS portable extraction path).
-  const execPath = `"${process.execPath}"`;
-  const scriptPath = `"${startJsPath}"`;
+  // If packaged, rewrite paths to use the unpacked ASAR directory so that
+  // the pure Node process (ELECTRON_RUN_AS_NODE) can read the real files on disk.
+  if (startJsPath.includes('app.asar')) {
+    startJsPath = startJsPath.replace('app.asar', 'app.asar.unpacked');
+    cwd = cwd.replace('app.asar', 'app.asar.unpacked');
+  }
 
-  nodeProcess = spawn(execPath, [scriptPath], {
+  nodeProcess = spawn(process.execPath, [startJsPath], {
     cwd: cwd,
     env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0', ELECTRON_RUN_AS_NODE: '1' },
-    stdio: 'pipe',
-    shell: true
+    stdio: 'pipe'
   });
 
   const forward = (data) => {
     const text = data.toString();
+    try { fs.appendFileSync(path.join(app.getPath('userData'), 'dma-debug.log'), text + '\\n'); } catch (e) {}
     if (mainWindow) {
       mainWindow.webContents.send('log-message', text);
     }
@@ -57,8 +57,9 @@ function startNodeServer() {
   nodeProcess.stderr.on('data', forward);
 
   nodeProcess.on('exit', (code) => {
+    try { fs.appendFileSync(path.join(app.getPath('userData'), 'dma-debug.log'), `[DMA] Server process exited with code ${code}\\n`); } catch (e) {}
     if (mainWindow) {
-      mainWindow.webContents.send('log-message', `\n[DMA] Server process exited with code ${code}`);
+      mainWindow.webContents.send('log-message', `\\n[DMA] Server process exited with code ${code}`);
     }
   });
 }

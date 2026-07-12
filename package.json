@@ -6,6 +6,7 @@
   "build": {
     "appId": "com.dockermanager.app",
     "productName": "DockerManagerApp",
+    "icon": "public/icon",
     "directories": {
       "output": "dist"
     },
@@ -25,15 +26,30 @@
       "favicon.ico",
       "package.json"
     ],
+    "asarUnpack": [
+      ".next/standalone/**/*",
+      ".next/static/**/*",
+      "public/**/*",
+      "start.js"
+    ],
     "artifactName": "Docker-Manager-${version}-${os}-${arch}.${ext}",
     "mac": {
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     }
   },
   "scripts": {
@@ -43,10 +59,12 @@
     "lint": "eslint",
     "build:electron:mac": "electron-builder --mac --x64 --arm64",
     "build:electron:linux": "electron-builder --linux --x64",
+    "remove-symlinks": "node -e \"const fs = require('fs'); const path = require('path'); function removeSymlinks(dir) { if (!fs.existsSync(dir)) return; const files = fs.readdirSync(dir); for (const file of files) { const fullPath = path.join(dir, file); const stat = fs.lstatSync(fullPath); if (stat.isSymbolicLink()) { const target = fs.realpathSync(fullPath); fs.unlinkSync(fullPath); if (fs.statSync(target).isDirectory()) { fs.cpSync(target, fullPath, { recursive: true }); } else { fs.copyFileSync(target, fullPath); } } else if (stat.isDirectory()) { removeSymlinks(fullPath); } } } removeSymlinks('.next/standalone');\"",
+    "prebuild:electron:win": "npm run remove-symlinks",
     "build:electron:win": "electron-builder --win --x64"
   },
   "dependencies": {
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "jose": "^6.2.3",
     "lru-cache": "^11.5.2",
     "lucide-react": "^1.21.0",
@@ -59,7 +77,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/bcrypt": "^6.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

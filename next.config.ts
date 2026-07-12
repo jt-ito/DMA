@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["ssh2", "node-ssh", "bcrypt"],
+  serverExternalPackages: ["ssh2", "node-ssh"],
   poweredByHeader: false,
   async headers() {
     return [

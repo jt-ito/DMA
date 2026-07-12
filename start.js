@@ -57,7 +57,7 @@ async function firstTimeSetup() {
 
   console.log('\nGenerating secure secrets... Please wait.');
   
-  const bcrypt = require('bcrypt');
+  const bcrypt = require('bcryptjs');
   const salt = bcrypt.genSaltSync(10);
   const hash = bcrypt.hashSync(password, salt);
   
@@ -119,7 +119,7 @@ async function main() {
   }
 
   process.env.PORT = process.env.PORT || 3000;
-  process.env.HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
+  process.env.HOSTNAME = '0.0.0.0';
   process.env.NODE_ENV = 'production';
 
   if (process.env.PORT === '3000' || process.env.PORT === 3000) {

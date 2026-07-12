@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { encrypt } from '@/lib/auth';
 import { cookies } from 'next/headers';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import rateLimit from '@/lib/rate-limit';
 
 const limiter = rateLimit({
