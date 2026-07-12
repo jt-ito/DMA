@@ -59,9 +59,9 @@ function startNodeServer() {
   nodeProcess.on('exit', (code, signal) => {
     serverRunning = false;
     const reason = code !== null ? `code ${code}` : `signal ${signal || 'killed'}`;
-    try { fs.appendFileSync(path.join(app.getPath('userData'), 'dma-debug.log'), `[DMA] Server process exited with ${reason}\\n`); } catch (e) {}
+    try { fs.appendFileSync(path.join(app.getPath('userData'), 'dma-debug.log'), `[DMA] Server process exited with ${reason}\n`); } catch (e) {}
     if (mainWindow) {
-      mainWindow.webContents.send('log-message', `\\n[DMA] Server process exited with ${reason}`);
+      mainWindow.webContents.send('log-message', `[DMA] Server process exited with ${reason}`);
       mainWindow.webContents.send('log-message', 'SERVER_STOPPED');
     }
   });
