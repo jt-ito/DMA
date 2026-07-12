@@ -35,6 +35,12 @@
       "start.js"
     ],
     "artifactName": "Docker-Manager-${version}-${os}-${arch}.${ext}",
+    "nsis": {
+      "artifactName": "Docker-Manager-Setup-${version}-${os}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Docker-Manager-Portable-${version}-${os}-${arch}.${ext}"
+    },
     "mac": {
       "target": [
         "dmg",
