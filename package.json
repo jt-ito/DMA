@@ -59,11 +59,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:electron:mac": "electron-builder --mac --x64 --arm64",
-    "build:electron:linux": "electron-builder --linux --x64",
+    "build:electron:mac": "electron-builder --mac --x64 --arm64 --publish never",
+    "build:electron:linux": "electron-builder --linux --x64 --publish never",
     "remove-symlinks": "node -e \"const fs = require('fs'); const path = require('path'); function removeSymlinks(dir) { if (!fs.existsSync(dir)) return; const files = fs.readdirSync(dir); for (const file of files) { const fullPath = path.join(dir, file); const stat = fs.lstatSync(fullPath); if (stat.isSymbolicLink()) { const target = fs.realpathSync(fullPath); fs.unlinkSync(fullPath); if (fs.statSync(target).isDirectory()) { fs.cpSync(target, fullPath, { recursive: true }); } else { fs.copyFileSync(target, fullPath); } } else if (stat.isDirectory()) { removeSymlinks(fullPath); } } } removeSymlinks('.next/standalone');\"",
     "prebuild:electron:win": "npm run remove-symlinks",
-    "build:electron:win": "electron-builder --win --x64"
+    "build:electron:win": "electron-builder --win --x64 --publish never"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
