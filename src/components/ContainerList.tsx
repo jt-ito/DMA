@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown } from 'lucide-react';
+import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import { DockerContainer } from '@/lib/docker';
 import styles from './ContainerList.module.css';
 
@@ -43,6 +43,14 @@ export function ContainerList({ envId, isDeploying }: Props) {
   const [selectedContainerName, setSelectedContainerName] = useState<string>('');
   const [updatingAll, setUpdatingAll] = useState(false);
   const logsContainerRef = useRef<HTMLPreElement>(null);
+
+  const handleCopyLogs = async () => {
+    try {
+      await navigator.clipboard.writeText(currentLogs);
+    } catch (err) {
+      console.error('Failed to copy logs:', err);
+    }
+  };
 
   const handleExportLogs = () => {
     const blob = new Blob([currentLogs], { type: 'text/plain' });
@@ -405,6 +413,9 @@ export function ContainerList({ envId, isDeploying }: Props) {
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <button title="Export Logs" className={styles.actionBtn} onClick={handleExportLogs}>
                   <Download size={18} />
+                </button>
+                <button title="Copy Logs" className={styles.actionBtn} onClick={handleCopyLogs}>
+                  <Copy size={18} />
                 </button>
                 <button title="Scroll to Top" className={styles.actionBtn} onClick={scrollToTop}>
                   <ArrowUp size={18} />

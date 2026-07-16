@@ -60,7 +60,7 @@ function startNodeServer() {
     serverRunning = false;
     const reason = code !== null ? `code ${code}` : `signal ${signal || 'killed'}`;
     try { fs.appendFileSync(path.join(app.getPath('userData'), 'dma-debug.log'), `[DMA] Server process exited with ${reason}\n`); } catch (e) {}
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('log-message', `[DMA] Server process exited with ${reason}`);
       mainWindow.webContents.send('log-message', 'SERVER_STOPPED');
     }
