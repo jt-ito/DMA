@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import { DockerContainer } from '@/lib/docker';
+import { CustomModal } from './CustomModal';
+import { RemoteFileBrowser } from './RemoteFileBrowser';
 import styles from './ContainerList.module.css';
 
 interface Props {
@@ -43,6 +45,78 @@ export function ContainerList({ envId, isDeploying }: Props) {
   const [selectedContainerName, setSelectedContainerName] = useState<string>('');
   const [updatingAll, setUpdatingAll] = useState(false);
   const logsContainerRef = useRef<HTMLPreElement>(null);
+  
+  const [remoteBrowserOpen, setRemoteBrowserOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    type: 'alert' | 'confirm';
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  } | null>(null);
+
+  const showAlert = (title: string, message: string) => {
+    return new Promise<void>((resolve) => {
+      setModalConfig({
+        isOpen: true,
+        type: 'alert',
+        title,
+        message,
+        onConfirm: () => {
+          setModalConfig(null);
+          resolve();
+        }
+      });
+    });
+  };
+
+  const showConfirm = (title: string, message: string) => {
+    return new Promise<boolean>((resolve) => {
+      setModalConfig({
+        isOpen: true,
+        type: 'confirm',
+        title,
+        message,
+        onConfirm: () => {
+          setModalConfig(null);
+          resolve(true);
+        },
+        onCancel: () => {
+          setModalConfig(null);
+          resolve(false);
+        }
+      });
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      if (event.target?.result) {
+        const yamlContent = event.target.result as string;
+        setUpdatingAll(true);
+        try {
+          await apiPost('/api/compose/deploy', { 
+            envId, 
+            yamlContent,
+          });
+          showAlert('Success', 'Successfully deployed compose project.');
+        } catch (error: any) {
+          showAlert('Deploy Failed', error.message);
+        }
+        fetchContainers();
+        setUpdatingAll(false);
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleCopyLogs = async () => {
     try {
@@ -157,7 +231,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
       fetchContainers();
     } catch (e) {
       console.error(e);
-      alert(`Action failed: ${e instanceof Error ? e.message : String(e)}`);
+      showAlert('Action Failed', `${e instanceof Error ? e.message : String(e)}`);
     }
     setContainerState(containerId, null);
   };
@@ -174,7 +248,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
       fetchContainers();
     } catch (e) {
       console.error(e);
-      alert(`Down failed: ${e instanceof Error ? e.message : String(e)}`);
+      showAlert('Down Failed', `${e instanceof Error ? e.message : String(e)}`);
     }
     setContainerState(container.ID, null);
   };
@@ -205,15 +279,57 @@ export function ContainerList({ envId, isDeploying }: Props) {
       if (!skipFetch) fetchContainers();
     } catch (e) {
       console.error(e);
-      alert(`Update failed for ${container.Names}: ${e instanceof Error ? e.message : String(e)}`);
+      showAlert(`Update Failed for ${container.Names}`, `${e instanceof Error ? e.message : String(e)}`);
     }
     setContainerState(container.ID, null);
   };
 
   const handleUpdateAll = async () => {
+    if (containers.length === 0) {
+      // Pull All flow
+      try {
+        const res = await fetch(`/api/environments`);
+        const envs = await res.json();
+        const env = envs.find((e: any) => e.id === envId);
+        if (!env) {
+          showAlert('Error', 'Environment not found.');
+          return;
+        }
+
+        if (env.composeFilePath || env.composeYaml) {
+          // File is configured, just deploy it
+          setUpdatingAll(true);
+          try {
+            await apiPost('/api/compose/deploy', { 
+              envId, 
+              yamlContent: env.composeYaml || '', 
+              composeFilePath: env.composeFilePath,
+              pruneImages: env.pruneImagesOnDeploy 
+            });
+            showAlert('Success', 'Successfully deployed compose project.');
+          } catch (e: any) {
+            showAlert('Deploy Failed', e.message);
+          }
+          fetchContainers();
+          setUpdatingAll(false);
+          return;
+        }
+
+        // Need file picker
+        if (env.type === 'local') {
+          fileInputRef.current?.click();
+        } else {
+          setRemoteBrowserOpen(true);
+        }
+      } catch (e: any) {
+        showAlert('Error', 'Failed to fetch environment details.');
+      }
+      return;
+    }
+
     const composeContainers = containers.filter(c => c.Project && c.Service && c.WorkingDir);
     if (composeContainers.length === 0) {
-       alert("No compose containers found to update.");
+       showAlert('Info', 'No compose containers found to update.');
        return;
     }
     
@@ -232,7 +348,8 @@ export function ContainerList({ envId, isDeploying }: Props) {
     }
     const projects = Array.from(uniqueProjects.values());
 
-    if (!confirm(`Are you sure you want to update all ${projects.length} compose projects? This will take down all projects, prune system, pull new images, and bring them back up.`)) return;
+    const confirmed = await showConfirm('Update All', `Are you sure you want to update all ${projects.length} compose projects? This will take down all projects, prune system, pull new images, and bring them back up.`);
+    if (!confirmed) return;
     
     setUpdatingAll(true);
     
@@ -260,7 +377,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
       }
     } catch (e) {
       console.error(e);
-      alert(`Update All failed: ${e instanceof Error ? e.message : String(e)}`);
+      showAlert('Update All Failed', `${e instanceof Error ? e.message : String(e)}`);
     }
 
     projects.forEach(p => p.containerIds.forEach(id => setContainerState(id, null)));
@@ -305,6 +422,14 @@ export function ContainerList({ envId, isDeploying }: Props) {
   return (
     <div className={`glass-panel ${styles.panel}`}>
       
+      <input 
+        type="file" 
+        accept=".yml,.yaml" 
+        ref={fileInputRef} 
+        style={{ display: 'none' }} 
+        onChange={handleFileChange}
+      />
+      
       {isDeploying && (
         <div className={styles.deployOverlay}>
           <div className={styles.deployOverlayContent}>
@@ -321,11 +446,11 @@ export function ContainerList({ envId, isDeploying }: Props) {
           <button 
             className="glass-button" 
             onClick={handleUpdateAll} 
-            disabled={updatingAll}
+            disabled={updatingAll || (loading && containers.length === 0)}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <RefreshCw size={16} className={updatingAll ? styles.spin : ''} /> 
-            {updatingAll ? 'Updating All...' : 'Update All'}
+            {updatingAll ? 'Updating...' : (containers.length === 0 ? 'Pull All' : 'Update All')}
           </button>
           <button className="glass-button" onClick={() => fetchContainers(true)} disabled={updatingAll}>
             Refresh
@@ -479,6 +604,31 @@ export function ContainerList({ envId, isDeploying }: Props) {
           </div>
         </div>
       )}
+
+      {remoteBrowserOpen && (
+        <RemoteFileBrowser 
+          envId={envId}
+          onClose={() => setRemoteBrowserOpen(false)}
+          onFileSelect={async (content, filePath) => {
+            setRemoteBrowserOpen(false);
+            setUpdatingAll(true);
+            try {
+              await apiPost('/api/compose/deploy', { 
+                envId, 
+                yamlContent: content,
+                composeFilePath: filePath
+              });
+              showAlert('Success', 'Successfully deployed remote compose project.');
+            } catch (error: any) {
+              showAlert('Deploy Failed', error.message);
+            }
+            fetchContainers();
+            setUpdatingAll(false);
+          }}
+        />
+      )}
+
+      {modalConfig && <CustomModal {...modalConfig} />}
     </div>
   );
 }
