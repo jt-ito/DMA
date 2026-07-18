@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getEnvironment } from '@/lib/store';
-import { composeCommand, pruneImages, removeImage } from '@/lib/docker';
+import { composeCommand, pruneImages, removeImage, systemPrune } from '@/lib/docker';
 import { ComposeCommandSchema } from '@/lib/validations';
 import { z } from 'zod';
 import rateLimit from '@/lib/rate-limit';
@@ -27,6 +27,8 @@ export async function POST(request: Request) {
     
     if (action === 'prune') {
       await pruneImages(env);
+    } else if (action === 'system-prune') {
+      await systemPrune(env);
     } else if (action === 'rmi') {
       if (!imageName) return NextResponse.json({ error: 'Missing imageName' }, { status: 400 });
       await removeImage(env, imageName);

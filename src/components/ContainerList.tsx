@@ -217,12 +217,53 @@ export function ContainerList({ envId, isDeploying }: Props) {
        return;
     }
     
-    if (!confirm(`Are you sure you want to update all ${composeContainers.length} compose containers? This will process them sequentially and may take a while.`)) return;
+    const uniqueProjects = new Map<string, { WorkingDir: string, ConfigFiles?: string, EnvironmentFiles?: string, containerIds: string[] }>();
+    for (const c of composeContainers) {
+      if (!c.WorkingDir) continue;
+      if (!uniqueProjects.has(c.WorkingDir)) {
+        uniqueProjects.set(c.WorkingDir, {
+          WorkingDir: c.WorkingDir,
+          ConfigFiles: c.ConfigFiles,
+          EnvironmentFiles: c.EnvironmentFiles,
+          containerIds: []
+        });
+      }
+      uniqueProjects.get(c.WorkingDir)!.containerIds.push(c.ID);
+    }
+    const projects = Array.from(uniqueProjects.values());
+
+    if (!confirm(`Are you sure you want to update all ${projects.length} compose projects? This will take down all projects, prune system, pull new images, and bring them back up.`)) return;
     
     setUpdatingAll(true);
-    for (const c of composeContainers) {
-      await handleUpdateCompose(c, true);
+    
+    try {
+      // 1. Down all projects
+      for (const p of projects) {
+        p.containerIds.forEach(id => setContainerState(id, 'stopping'));
+        await apiPost('/api/compose', { action: 'down', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
+      }
+
+      // 2. System prune
+      projects.forEach(p => p.containerIds.forEach(id => setContainerState(id, 'cleaning')));
+      await apiPost('/api/compose', { action: 'system-prune', envId });
+
+      // 3. Pull all projects
+      for (const p of projects) {
+        p.containerIds.forEach(id => setContainerState(id, 'pulling'));
+        await apiPost('/api/compose', { action: 'pull', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
+      }
+
+      // 4. Up all projects
+      for (const p of projects) {
+        p.containerIds.forEach(id => setContainerState(id, 'starting'));
+        await apiPost('/api/compose', { action: 'up -d', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
+      }
+    } catch (e) {
+      console.error(e);
+      alert(`Update All failed: ${e instanceof Error ? e.message : String(e)}`);
     }
+
+    projects.forEach(p => p.containerIds.forEach(id => setContainerState(id, null)));
     fetchContainers();
     setUpdatingAll(false);
   };

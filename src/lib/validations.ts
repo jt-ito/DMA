@@ -4,7 +4,7 @@ export const EnvIdSchema = z.string().uuid().or(z.string().min(1).max(50).regex(
 
 export const ContainerActionSchema = z.enum(['start', 'stop', 'restart', 'remove']);
 
-export const ComposeActionSchema = z.enum(['pull', 'up -d', 'stop', 'rm -f', 'prune', 'rmi', 'down --rmi all', 'up -d --remove-orphans']);
+export const ComposeActionSchema = z.enum(['pull', 'up -d', 'stop', 'rm -f', 'prune', 'system-prune', 'rmi', 'down', 'down --rmi all', 'up -d --remove-orphans']);
 
 export const ManageContainerSchema = z.object({
   envId: EnvIdSchema,

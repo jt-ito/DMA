@@ -117,6 +117,14 @@ export async function pruneImages(env: Environment): Promise<void> {
   }
 }
 
+export async function systemPrune(env: Environment): Promise<void> {
+  try {
+    await executeCommand(env, 'docker', ['system', 'prune', '-a', '-f']);
+  } catch (e) {
+    console.warn("Failed to system prune", e);
+  }
+}
+
 export async function removeImage(env: Environment, image: string): Promise<void> {
   try {
     await executeCommand(env, 'docker', ['rmi', '-f', image]);
