@@ -196,7 +196,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
       
       // 4. Pull
       setContainerState(container.ID, 'pulling');
-      await apiPost('/api/compose', { action: 'pull', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles }).catch(e => { throw new Error('Pull step failed:\n' + e.message) });
+      await apiPost('/api/compose', { action: 'pull --ignore-pull-failures', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles }).catch(e => { throw new Error('Pull step failed:\n' + e.message) });
       
       // 5. Start
       setContainerState(container.ID, 'starting');
@@ -250,7 +250,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
       // 3. Pull all projects
       for (const p of projects) {
         p.containerIds.forEach(id => setContainerState(id, 'pulling'));
-        await apiPost('/api/compose', { action: 'pull', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
+        await apiPost('/api/compose', { action: 'pull --ignore-pull-failures', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
       }
 
       // 4. Up all projects

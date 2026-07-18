@@ -161,7 +161,7 @@ export async function deployCompose(env: Environment, yamlContent: string, compo
       await executeCommand(env, `cat << '${delimiter}' > "${composeFilePath}"\n${yamlContent}\n${delimiter}`);
     }
     
-    await composeCommand(env, 'pull', dir, undefined, composeFilePath);
+    await composeCommand(env, 'pull --ignore-pull-failures', dir, undefined, composeFilePath);
     await composeCommand(env, 'up -d --remove-orphans', dir, undefined, composeFilePath);
   } else {
     const tempFileName = `docker-compose-temp-${Date.now()}.yml`;
