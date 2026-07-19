@@ -26,30 +26,42 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
   
   const containerIds = containers.map(c => c.ID);
   
+  let inspectOut = '';
   try {
-    const { stdout: inspectOut } = await executeCommand(env, 'docker', ['inspect', '--format={{json .Config.Labels}}---{{json .State.StartedAt}}', ...containerIds]);
-    const inspectLines = inspectOut.trim().split('\n').filter(line => line.length > 0);
-    
-    for (let i = 0; i < containers.length; i++) {
-       if (inspectLines[i]) {
-           const parts = inspectLines[i].split('---');
-           if (parts[0] && parts[0] !== 'null') {
-               try {
-                   const labels = JSON.parse(parts[0]);
-                   containers[i].Project = labels['com.docker.compose.project'] || null;
-                   containers[i].Service = labels['com.docker.compose.service'] || null;
-                   containers[i].WorkingDir = labels['com.docker.compose.project.working_dir'] || null;
-                   containers[i].ConfigFiles = labels['com.docker.compose.project.config_files'] || null;
-                   containers[i].EnvironmentFiles = labels['com.docker.compose.project.environment_file'] || null;
-               } catch(e) {}
-           }
-           if (parts[1] && parts[1] !== 'null') {
-               try { containers[i].StartedAt = JSON.parse(parts[1]); } catch(e) {}
-           }
-       }
+    const res = await executeCommand(env, 'docker', ['inspect', '--format={{.Id}}---{{json .Config.Labels}}---{{json .State.StartedAt}}', ...containerIds]);
+    inspectOut = res.stdout;
+  } catch (e: any) {
+    inspectOut = e.stdout || '';
+    console.warn("Partial failure inspecting containers:", e);
+  }
+
+  const inspectLines = inspectOut.trim().split('\n').filter(line => line.length > 0);
+  
+  const inspectMap: Record<string, { labels: any, startedAt: any }> = {};
+  for (const line of inspectLines) {
+    const parts = line.split('---');
+    if (parts.length >= 3) {
+      const id = parts[0];
+      let labels = {};
+      let startedAt = null;
+      try { if (parts[1] && parts[1] !== 'null') labels = JSON.parse(parts[1]); } catch(e) {}
+      try { if (parts[2] && parts[2] !== 'null') startedAt = JSON.parse(parts[2]); } catch(e) {}
+      inspectMap[id] = { labels, startedAt };
     }
-  } catch (e) {
-    console.warn("Failed to inspect containers for labels:", e);
+  }
+
+  for (let i = 0; i < containers.length; i++) {
+     const c = containers[i];
+     const dataKey = Object.keys(inspectMap).find(k => k.startsWith(c.ID));
+     const data = dataKey ? inspectMap[dataKey] : null;
+     if (data) {
+         c.Project = data.labels['com.docker.compose.project'] || null;
+         c.Service = data.labels['com.docker.compose.service'] || null;
+         c.WorkingDir = data.labels['com.docker.compose.project.working_dir'] || null;
+         c.ConfigFiles = data.labels['com.docker.compose.project.config_files'] || null;
+         c.EnvironmentFiles = data.labels['com.docker.compose.project.environment_file'] || null;
+         c.StartedAt = data.startedAt;
+     }
   }
   
   return containers;

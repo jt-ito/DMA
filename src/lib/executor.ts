@@ -53,8 +53,12 @@ export async function executeCommand(env: Environment, command: string, args?: s
     const result = await ssh.execCommand(finalCommand);
     ssh.dispose();
     
-    if (result.code !== 0 && result.stderr) {
-       throw new Error(result.stderr);
+    if (result.code !== 0) {
+       const err: any = new Error(result.stderr || `Command failed with code ${result.code}`);
+       err.stdout = result.stdout;
+       err.stderr = result.stderr;
+       err.code = result.code;
+       throw err;
     }
     
     return {
