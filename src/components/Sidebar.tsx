@@ -29,14 +29,19 @@ export function Sidebar({ onSelectEnv, selectedEnvId }: SidebarProps) {
       .then(res => res.json())
       .then(data => {
         setEnvironments(data);
-        if (data.length > 0 && !selectedEnvId) {
-          onSelectEnv(data[0]);
-        } else if (selectedEnvId) {
-          const env = data.find((e: Environment) => e.id === selectedEnvId);
-          if (env) onSelectEnv(env);
+        if (data.length > 0) {
+          const savedId = localStorage.getItem('selectedEnvId');
+          let targetEnv = data[0];
+          if (savedId) {
+            const found = data.find((e: Environment) => e.id === savedId);
+            if (found) targetEnv = found;
+          }
+          onSelectEnv(targetEnv);
+          localStorage.setItem('selectedEnvId', targetEnv.id);
         }
       });
-  }, [selectedEnvId, onSelectEnv]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleDisable = async (e: React.MouseEvent, env: Environment) => {
     e.stopPropagation(); // prevent selecting the env
@@ -78,7 +83,10 @@ export function Sidebar({ onSelectEnv, selectedEnvId }: SidebarProps) {
           <li 
             key={env.id} 
             className={`${styles.envItem} ${selectedEnvId === env.id ? styles.active : ''} ${env.disabled ? styles.disabled : ''}`}
-            onClick={() => onSelectEnv(env)}
+            onClick={() => {
+              localStorage.setItem('selectedEnvId', env.id);
+              onSelectEnv(env);
+            }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
               <Server size={18} />
@@ -109,6 +117,7 @@ export function Sidebar({ onSelectEnv, selectedEnvId }: SidebarProps) {
         onClose={() => setIsModalOpen(false)} 
         onAdded={(env) => {
           setEnvironments([...environments, env]);
+          localStorage.setItem('selectedEnvId', env.id);
           onSelectEnv(env);
         }} 
       />
