@@ -1,75 +1,15 @@
 {
   "name": "docker-manager",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A Docker Management Desktop App",
   "author": "Docker Manager <admin@example.com>",
   "private": true,
-  "main": "electron/main.js",
-  "build": {
-    "appId": "com.dockermanager.app",
-    "productName": "DockerManagerApp",
-    "icon": "public/icon",
-    "directories": {
-      "output": "dist"
-    },
-    "npmRebuild": false,
-    "files": [
-      "!.git/**/*",
-      "!node_modules/**/*",
-      "!.next/**/*",
-      "!src/**/*",
-      "!webview2/**/*",
-      ".next/standalone/**/*",
-      ".next/static/**/*",
-      "public/**/*",
-      "electron/**/*",
-      "launcher-ui.html",
-      "start.js",
-      "favicon.ico",
-      "package.json"
-    ],
-    "asarUnpack": [
-      ".next/standalone/**/*",
-      ".next/static/**/*",
-      "public/**/*",
-      "start.js"
-    ],
-    "artifactName": "Docker-Manager-${version}-${os}-${arch}.${ext}",
-    "nsis": {
-      "artifactName": "Docker-Manager-Setup-${version}-${os}-${arch}.${ext}"
-    },
-    "portable": {
-      "artifactName": "Docker-Manager-Portable-${version}-${os}-${arch}.${ext}"
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ]
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    }
-  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:electron:mac": "electron-builder --mac --x64 --arm64 --publish never",
-    "build:electron:linux": "electron-builder --linux --x64 --publish never",
-    "remove-symlinks": "node -e \"const fs = require('fs'); const path = require('path'); function removeSymlinks(dir) { if (!fs.existsSync(dir)) return; const files = fs.readdirSync(dir); for (const file of files) { const fullPath = path.join(dir, file); const stat = fs.lstatSync(fullPath); if (stat.isSymbolicLink()) { const target = fs.realpathSync(fullPath); fs.unlinkSync(fullPath); if (fs.statSync(target).isDirectory()) { fs.cpSync(target, fullPath, { recursive: true }); } else { fs.copyFileSync(target, fullPath); } } else if (stat.isDirectory()) { removeSymlinks(fullPath); } } } removeSymlinks('.next/standalone');\"",
-    "prebuild:electron:win": "npm run remove-symlinks",
-    "build:electron:win": "electron-builder --win --x64 --publish never"
+    "tauri": "tauri"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -85,13 +25,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "caxa": "^3.0.1",
-    "electron": "^43.1.0",
-    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "innosetup-compiler": "^6.3.1",

@@ -44,6 +44,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
   const [logsLoading, setLogsLoading] = useState(false);
   const [selectedContainerName, setSelectedContainerName] = useState<string>('');
   const [updatingAll, setUpdatingAll] = useState(false);
+  const [updateAllStatus, setUpdateAllStatus] = useState<string>('');
   const logsContainerRef = useRef<HTMLPreElement>(null);
   
   const [remoteBrowserOpen, setRemoteBrowserOpen] = useState(false);
@@ -101,6 +102,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
       if (event.target?.result) {
         const yamlContent = event.target.result as string;
         setUpdatingAll(true);
+        setUpdateAllStatus('Pulling and deploying selected file...');
         try {
           await apiPost('/api/compose/deploy', { 
             envId, 
@@ -299,6 +301,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
         if (env.composeFilePath || env.composeYaml) {
           // File is configured, just deploy it
           setUpdatingAll(true);
+          setUpdateAllStatus('Pulling and deploying compose project...');
           try {
             await apiPost('/api/compose/deploy', { 
               envId, 
@@ -352,25 +355,30 @@ export function ContainerList({ envId, isDeploying }: Props) {
     if (!confirmed) return;
     
     setUpdatingAll(true);
+    setUpdateAllStatus('Initializing update...');
     
     try {
       // 1. Down all projects
+      setUpdateAllStatus('Stopping projects...');
       for (const p of projects) {
         p.containerIds.forEach(id => setContainerState(id, 'stopping'));
         await apiPost('/api/compose', { action: 'down', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
       }
 
       // 2. System prune
+      setUpdateAllStatus('Pruning old images and containers...');
       projects.forEach(p => p.containerIds.forEach(id => setContainerState(id, 'cleaning')));
       await apiPost('/api/compose', { action: 'system-prune', envId });
 
       // 3. Pull all projects
+      setUpdateAllStatus('Pulling new images (this may take a while)...');
       for (const p of projects) {
         p.containerIds.forEach(id => setContainerState(id, 'pulling'));
         await apiPost('/api/compose', { action: 'pull --ignore-pull-failures', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
       }
 
       // 4. Up all projects
+      setUpdateAllStatus('Starting projects...');
       for (const p of projects) {
         p.containerIds.forEach(id => setContainerState(id, 'starting'));
         await apiPost('/api/compose', { action: 'up -d', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
@@ -430,12 +438,12 @@ export function ContainerList({ envId, isDeploying }: Props) {
         onChange={handleFileChange}
       />
       
-      {isDeploying && (
+      { (isDeploying || updatingAll) && (
         <div className={styles.deployOverlay}>
           <div className={styles.deployOverlayContent}>
             <div className={styles.spinner}></div>
-            <h2>Deploying Compose Stack...</h2>
-            <p>Your containers are being updated. This may take a few moments as we pull images and recreate services.</p>
+            <h2>{isDeploying ? 'Deploying Compose Stack...' : 'Updating Environments...'}</h2>
+            <p>{isDeploying ? 'Your containers are being updated. This may take a few moments as we pull images and recreate services.' : (updateAllStatus || 'Working...')}</p>
           </div>
         </div>
       )}
@@ -612,6 +620,7 @@ export function ContainerList({ envId, isDeploying }: Props) {
           onFileSelect={async (content, filePath) => {
             setRemoteBrowserOpen(false);
             setUpdatingAll(true);
+            setUpdateAllStatus('Pulling and deploying selected file...');
             try {
               await apiPost('/api/compose/deploy', { 
                 envId, 
