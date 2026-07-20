@@ -28,12 +28,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js App
-        run: npm run build
-        env:
-          JWT_SECRET: "dummy_secret_for_build_only_1234567890"
-          ADMIN_PASSWORD_HASH: "dummy_hash_for_build_only"
-
       - name: Prepare Standalone Assets
         shell: bash
         run: |
@@ -62,6 +56,9 @@ jobs:
 
       - name: Build Tauri App
         run: npm run tauri build
+        env:
+          JWT_SECRET: "dummy_secret_for_build_only_1234567890"
+          ADMIN_PASSWORD_HASH: "dummy_hash_for_build_only"
 
       - name: Copy Tauri Outputs to dist
         shell: bash

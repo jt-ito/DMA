@@ -1,13 +1,13 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "docker-manager",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "identifier": "com.dockermanager.app",
   "build": {
     "frontendDist": "../tauri-ui",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:frontend"
   },
   "app": {
     "windows": [
