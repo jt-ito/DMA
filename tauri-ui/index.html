@@ -1,62 +1,406 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Docker Manager</title>
+    <title>Docker Manager Launcher</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --bg-color: #f4f4f5;
+            --text-color: #18181b;
+            --card-bg: #ffffff;
+            --card-border: #e4e4e7;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --console-bg: #18181b;
+            --console-text: #a1a1aa;
+            --console-border: #27272a;
+            --modal-bg: rgba(255, 255, 255, 0.9);
+            --blur: blur(12px);
+        }
+
+        .dark {
+            --bg-color: #09090b;
+            --text-color: #fafafa;
+            --card-bg: #18181b;
+            --card-border: #27272a;
+            --console-bg: #000000;
+            --console-text: #a1a1aa;
+            --console-border: #27272a;
+            --modal-bg: rgba(9, 9, 11, 0.9);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #09090b;
-            color: #fafafa;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
             overflow: hidden;
+            transition: background-color 0.3s ease;
             user-select: none;
         }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--card-border);
+            background: var(--card-bg);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
         .brand-icon {
-            width: 64px;
-            height: 64px;
-            background-color: #3b82f6;
+            width: 48px;
+            height: 48px;
+            background-color: var(--primary);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 24px;
-            border-radius: 16px;
-            margin-bottom: 24px;
-            box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4);
+            font-size: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+        }
+
+        .brand h1 {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+        
+        .brand p {
+            font-size: 13px;
+            color: #71717a;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        button {
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            font-size: 14px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--card-border);
+            color: var(--text-color);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--card-border);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--card-border);
+        }
+
+        main {
+            flex: 1;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow: hidden;
+        }
+
+        .console-header {
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #22c55e;
+            border-radius: 50%;
             animation: pulse 2s infinite;
         }
-        h1 { font-size: 20px; margin-bottom: 8px; font-weight: 600; letter-spacing: -0.5px; }
-        p { color: #a1a1aa; font-size: 14px; }
-        .spinner {
-            margin-top: 32px;
-            width: 24px;
-            height: 24px;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-radius: 50%;
-            border-top-color: #3b82f6;
-            animation: spin 1s ease-in-out infinite;
+
+        .console {
+            flex: 1;
+            background-color: var(--console-bg);
+            border: 1px solid var(--console-border);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--console-text);
+            overflow-y: auto;
+            white-space: pre-wrap;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            user-select: text; /* Allow text selection in the console */
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .log-line {
+            margin-bottom: 4px;
+        }
+
+        .log-line.error {
+            color: #ef4444;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: var(--blur);
+            -webkit-backdrop-filter: var(--blur);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 100;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 32px;
+            border-radius: 16px;
+            width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+            text-align: center;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal h2 {
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+
+        .modal p {
+            color: #a1a1aa;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .modal-actions button {
+            width: 100%;
+            padding: 12px;
+        }
+
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--card-border);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #71717a;
         }
     </style>
 </head>
 <body>
-    <div class="brand-icon">DM</div>
-    <h1>Docker Manager</h1>
-    <p>Starting Next.js Server...</p>
-    <div class="spinner"></div>
+    <header>
+        <div class="brand">
+            <div class="brand-icon">DM</div>
+            <div>
+                <h1>Docker Manager</h1>
+                <p>Background Server Running</p>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="theme-toggle" id="themeBtn" aria-label="Toggle Theme">
+                <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+                <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+            </button>
+            <button class="btn-primary" id="openBrowserBtn">Open Web UI</button>
+            <button class="btn-danger" id="stopServerBtn">Stop Server</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="console-header">
+            <div class="status-dot"></div> Server Console
+        </div>
+        <div class="console" id="consoleOutput">
+            <div class="log-line">Initializing Docker Manager...</div>
+            <div class="log-line">Starting Next.js Server...</div>
+        </div>
+    </main>
+
+    <div class="modal-overlay" id="closeModal">
+        <div class="modal">
+            <h2>Close Application</h2>
+            <p>The background server is still running. Do you want to minimize to the system tray or stop the server?</p>
+            <div class="modal-actions">
+                <button class="btn-primary" id="minimizeBtn">Minimize to Tray</button>
+                <button class="btn-danger" id="stopCloseBtn">Stop Server & Close</button>
+                <button class="btn-outline" id="cancelBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use Global Tauri API injected by withGlobalTauri
+        const { invoke } = window.__TAURI__.core;
+        const { listen } = window.__TAURI__.event;
+
+        // Theme Toggle
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('themeBtn');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+
+        function toggleTheme() {
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            } else {
+                html.classList.add('dark');
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            }
+        }
+        themeBtn.addEventListener('click', toggleTheme);
+
+        // Buttons
+        document.getElementById('openBrowserBtn').addEventListener('click', () => {
+            invoke('open_browser');
+        });
+
+        document.getElementById('stopServerBtn').addEventListener('click', () => {
+            invoke('stop_server');
+            appendLog('Server stopped by user. You can now safely close the app.');
+            document.querySelector('.status-dot').style.backgroundColor = '#ef4444';
+            document.querySelector('.status-dot').style.animation = 'none';
+        });
+
+        // Console
+        const consoleOutput = document.getElementById('consoleOutput');
+        
+        function appendLog(line) {
+            const div = document.createElement('div');
+            div.className = 'log-line';
+            if (line.includes('ERROR:')) div.classList.add('error');
+            div.textContent = line;
+            consoleOutput.appendChild(div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        // Listen for server logs from Rust
+        listen('server-log', (event) => {
+            appendLog(event.payload);
+        });
+
+        // Close Modal Logic
+        const modal = document.getElementById('closeModal');
+        
+        listen('close-requested', () => {
+            modal.classList.add('active');
+        });
+
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            modal.classList.remove('active');
+        });
+
+        document.getElementById('minimizeBtn').addEventListener('click', () => {
+            modal.classList.remove('active');
+            invoke('minimize_window');
+        });
+
+        document.getElementById('stopCloseBtn').addEventListener('click', () => {
+            modal.classList.remove('active');
+            invoke('close_app');
+        });
+    </script>
 </body>
 </html>
