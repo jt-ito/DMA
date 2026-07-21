@@ -135,18 +135,31 @@ pub fn run() {
           let mut start_js_path = std::path::PathBuf::new();
           let mut node_cwd = std::path::PathBuf::new();
           if let Ok(resource_dir) = app.path().resource_dir() {
-              let prod_path = resource_dir.join("_up_").join(".next").join("standalone").join("start.js");
-              if prod_path.exists() {
-                  start_js_path = prod_path;
-                  node_cwd = resource_dir.join("_up_").join(".next").join("standalone");
-              } else {
-                  let mac_path = resource_dir.join(".next").join("standalone").join("start.js");
-                  if mac_path.exists() {
-                      start_js_path = mac_path;
-                      node_cwd = resource_dir.join(".next").join("standalone");
+              // Tauri v2 often drops the _up_ directory structure for resources if configured differently,
+              // so let's check multiple potential paths
+              let paths_to_check = vec![
+                  resource_dir.join("_up_").join(".next").join("standalone").join("start.js"),
+                  resource_dir.join(".next").join("standalone").join("start.js"),
+                  resource_dir.join("start.js"),
+              ];
+              
+              for path in paths_to_check {
+                  if path.exists() {
+                      start_js_path = path.clone();
+                      node_cwd = path.parent().unwrap().to_path_buf();
+                      break;
                   }
               }
           }
+          
+          if !start_js_path.exists() {
+              eprintln!("Failed to find start.js in resource directory. Ensure resources are bundled.");
+              if let Ok(resource_dir) = app.path().resource_dir() {
+                  eprintln!("Searched inside: {:?}", resource_dir);
+              }
+              return Ok(());
+          }
+          
           let mut c = Command::new("node");
           c.arg(&start_js_path).current_dir(&node_cwd);
           c
