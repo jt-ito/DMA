@@ -1,5 +1,7 @@
 use tauri::{Manager, Emitter};
 use std::process::{Command, Stdio};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::io::{BufRead, BufReader};
 use std::thread;
 use std::sync::{Arc, Mutex};
@@ -182,6 +184,9 @@ pub fn run() {
           c.arg(strip_unc(&start_js_path)).current_dir(strip_unc(&node_cwd));
           c
       };
+
+      #[cfg(target_os = "windows")]
+      cmd.creation_flags(0x08000000);
 
       cmd.env("PORT", "3000")
          .stdout(Stdio::piped())
