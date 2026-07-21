@@ -52,8 +52,17 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![stop_server, minimize_window, close_app, open_browser])
     .on_window_event(|window, event| match event {
         tauri::WindowEvent::CloseRequested { api, .. } => {
-            api.prevent_close();
-            let _ = window.emit("close-requested", ());
+            let state = window.app_handle().state::<AppState>();
+            let is_running = if let Ok(child_opt) = state.child.lock() {
+                child_opt.is_some()
+            } else {
+                false
+            };
+
+            if is_running {
+                api.prevent_close();
+                let _ = window.emit("close-requested", ());
+            }
         }
         _ => {}
     })
@@ -160,8 +169,17 @@ pub fn run() {
               return Ok(());
           }
           
+          let strip_unc = |p: &std::path::Path| -> String {
+              let s = p.to_string_lossy().into_owned();
+              if s.starts_with("\\\\?\\") {
+                  s[4..].to_string()
+              } else {
+                  s
+              }
+          };
+
           let mut c = Command::new("node");
-          c.arg(&start_js_path).current_dir(&node_cwd);
+          c.arg(strip_unc(&start_js_path)).current_dir(strip_unc(&node_cwd));
           c
       };
 
