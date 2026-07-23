@@ -30,23 +30,23 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 
 **Remote Server Management (Dark Mode)**
 *Manage your remote containers securely. The Compose Project column seamlessly groups complex stacks together for easy management.*
-![Remote Machine Dashboard](public/Remote_Machine.png)
+<img src="public/Remote_Machine.png" alt="Remote Machine Dashboard" width="800" />
 
 **Local Docker Engine (Dark Mode)**
 *Connect directly to your local Docker socket. Easily view standalone containers, ports, and precise uptimes at a glance.*
-![Local Machine Dashboard](public/Local_Machine.png)
+<img src="public/Local_Machine.png" alt="Local Machine Dashboard" width="800" />
 
 **Live Compose Editor**
 *Edit your `docker-compose.yml` files directly in the app. Make changes and instantly restart your entire stack without ever opening a terminal.*
-![Compose Editor](public/Compose_Editor.png)
+<img src="public/Compose_Editor.png" alt="Compose Editor" width="800" />
 
 **Remote File Browser**
 *Navigate your remote server's filesystem visually. Locate and import existing compose configurations with just a few clicks.*
-![Browse Remote File](public/Browse_Remote_File.png)
+<img src="public/Browse_Remote_File.png" alt="Browse Remote File" width="800" />
 
 **Public IP & Network Management**
 *Securely fetch and display your server's true Public IP on the fly, alongside active container ports.*
-![Public IP](public/Public_IP.png)
+<img src="public/Public_IP.png" alt="Public IP" width="800" />
 
 **Native Desktop Experience**
 *A standalone, blazing-fast native application window that completely removes the need for cluttered browser tabs.*
@@ -58,7 +58,7 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 
 **Environment Toggle (Light Mode)**
 *Easily disable and organize your different environments. Beautifully designed light mode interface for a brighter workspace.*
-![Disabled Environment](public/Disabled_Environment.png)
+<img src="public/Disabled_Environment.png" alt="Disabled Environment" width="800" />
 
 ## 🛡️ Enterprise-Grade Security
 
