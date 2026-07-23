@@ -48,6 +48,10 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 *Securely fetch and display your server's true Public IP on the fly, alongside active container ports.*
 ![Public IP](public/Public_IP.png)
 
+**Environment Management & Light Mode**
+*Keep your sidebar tidy by disabling inactive environments. Plus, enjoy a beautifully designed light mode interface for a brighter workspace.*
+![Disabled Environment](public/Disabled_Environment.png)
+
 **Native Desktop Experience**
 *A standalone, blazing-fast native application window that completely removes the need for cluttered browser tabs.*
 ![Running App UI](public/Running_App_UI.png)
@@ -55,10 +59,6 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 **System Tray Integration**
 *Runs quietly in the background. Minimize to your system tray and manage your Docker environments completely out of sight.*
 ![Close App UI](public/Close_App_UI.png)
-
-**Environment Management & Light Mode**
-*Keep your sidebar tidy by disabling inactive environments. Plus, enjoy a beautifully designed light mode interface for a brighter workspace.*
-![Disabled Environment](public/Disabled_Environment.png)
 
 ## 🛡️ Enterprise-Grade Security
 
