@@ -56,8 +56,8 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 *Runs quietly in the background. Minimize to your system tray and manage your Docker environments completely out of sight.*
 ![Close App UI](public/Close_App_UI.png)
 
-**Environment Toggle (Light Mode)**
-*Easily disable and organize your different environments. Beautifully designed light mode interface for a brighter workspace.*
+**Environment Management & Light Mode**
+*Keep your sidebar tidy by disabling inactive environments. Plus, enjoy a beautifully designed light mode interface for a brighter workspace.*
 ![Disabled Environment](public/Disabled_Environment.png)
 
 ## 🛡️ Enterprise-Grade Security
