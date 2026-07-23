@@ -26,6 +26,40 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 - **📜 Log Viewer**: Instantly view, stream, and **copy container logs** for rapid debugging without ever touching the terminal.
 - **📂 Compose File Discovery**: Effortlessly navigate your server's directories to locate and import existing `docker-compose.yml` projects without dropping into an SSH connection.
 
+### 🖼️ Gallery
+
+**Remote Server Management (Dark Mode)**
+*Manage your remote containers securely. The Compose Project column seamlessly groups complex stacks together for easy management.*
+![Remote Machine Dashboard](public/Remote_Machine.png)
+
+**Local Docker Engine (Dark Mode)**
+*Connect directly to your local Docker socket. Easily view standalone containers, ports, and precise uptimes at a glance.*
+![Local Machine Dashboard](public/Local_Machine.png)
+
+**Live Compose Editor**
+*Edit your `docker-compose.yml` files directly in the app. Make changes and instantly restart your entire stack without ever opening a terminal.*
+![Compose Editor](public/Compose_Editor.png)
+
+**Remote File Browser**
+*Navigate your remote server's filesystem visually. Locate and import existing compose configurations with just a few clicks.*
+![Browse Remote File](public/Browse_Remote_File.png)
+
+**Public IP & Network Management**
+*Securely fetch and display your server's true Public IP on the fly, alongside active container ports.*
+![Public IP](public/Public_IP.png)
+
+**Native Desktop Experience**
+*A standalone, blazing-fast native application window that completely removes the need for cluttered browser tabs.*
+![Running App UI](public/Running_App_UI.png)
+
+**System Tray Integration**
+*Runs quietly in the background. Minimize to your system tray and manage your Docker environments completely out of sight.*
+![Close App UI](public/Close_App_UI.png)
+
+**Environment Toggle (Light Mode)**
+*Easily disable and organize your different environments. Beautifully designed light mode interface for a brighter workspace.*
+![Disabled Environment](public/Disabled_Environment.png)
+
 ## 🛡️ Enterprise-Grade Security
 
 DMA is built with a defense-in-depth architecture to keep your host machines and containers safe:

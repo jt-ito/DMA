@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Executables
 dockermanager.exe
+
+# Demo
+docker-manager-demo/
