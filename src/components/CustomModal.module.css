@@ -62,13 +62,13 @@
 }
 
 .buttonPrimary {
-  background: var(--primary);
+  background: var(--accent);
   color: white;
-  border-color: var(--primary);
+  border-color: var(--accent);
 }
 
 .buttonPrimary:hover {
-  background: var(--primary-hover);
+  background: var(--accent-hover);
 }
 
 @keyframes fadeIn {

@@ -1,4 +1,22 @@
 import type { NextConfig } from "next";
+import fs from "fs";
+import path from "path";
+
+const configDir = path.join(process.env.USERPROFILE || process.env.HOME || process.cwd(), '.docker-manager');
+const envPath = path.join(configDir, '.env');
+
+if (fs.existsSync(envPath)) {
+  const content = fs.readFileSync(envPath, 'utf8');
+  content.split('\n').forEach(line => {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (match) {
+      let value = match[2] || '';
+      if (value.startsWith('"') && value.endsWith('"')) value = value.replace(/^"|"$/g, '').replace(/\\n/g, '\n');
+      else if (value.startsWith("'") && value.endsWith("'")) value = value.replace(/^'|'$/g, '');
+      process.env[match[1]] = value;
+    }
+  });
+}
 
 const nextConfig: NextConfig = {
   output: "standalone",

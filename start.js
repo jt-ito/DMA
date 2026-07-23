@@ -33,44 +33,7 @@ function loadEnv() {
 
 async function firstTimeSetup() {
   ensureConfigDir();
-  console.log('\n=============================================');
-  console.log('🐳 Welcome to Docker Manager App (DMA)');
-  console.log('=============================================\n');
-  console.log('It looks like this is your first time starting DMA.');
-  console.log('Let\'s set up your secure administrator credentials.\n');
-
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  
-  const askPassword = () => new Promise(resolve => {
-    rl.question('Create an Admin Password (for user "admin"): ', (answer) => {
-      if (answer.length < 4) {
-        console.log('Password must be at least 4 characters.\n');
-        resolve(askPassword());
-      } else {
-        resolve(answer);
-      }
-    });
-  });
-
-  const password = await askPassword();
-  rl.close();
-
-  console.log('\nGenerating secure secrets... Please wait.');
-  
-  const bcrypt = require('bcryptjs');
-  const salt = bcrypt.genSaltSync(10);
-  const hash = bcrypt.hashSync(password, salt);
-  
-  const jwtSecret = crypto.randomBytes(32).toString('base64');
-  
-  const envContent = `ADMIN_PASSWORD_HASH="${hash}"\nJWT_SECRET="${jwtSecret}"\n`;
-  fs.writeFileSync(envPath, envContent, { mode: 0o600 });
-  
-  console.log('\n✅ Setup complete! Your settings are securely saved in: ' + envPath);
-  console.log('Starting server...\n');
-  
-  process.env.ADMIN_PASSWORD_HASH = hash;
-  process.env.JWT_SECRET = jwtSecret;
+  // Next.js will now handle the first time setup via the /setup route GUI.
 }
 
 function killPort3000() {

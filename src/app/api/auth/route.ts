@@ -18,10 +18,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
-  const { password } = await request.json();
+  const { username, password } = await request.json();
 
-  if (!password) {
-    return NextResponse.json({ error: 'Missing password' }, { status: 400 });
+  if (!username || !password) {
+    return NextResponse.json({ error: 'Missing username or password' }, { status: 400 });
+  }
+
+  const expectedUsername = process.env.ADMIN_USERNAME;
+  if (expectedUsername && username !== expectedUsername) {
+    return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 });
   }
 
   const hash = process.env.ADMIN_PASSWORD_HASH;
@@ -32,7 +37,7 @@ export async function POST(request: Request) {
 
   const isValid = await bcrypt.compare(password, hash);
   if (!isValid) {
-    return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+    return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 });
   }
 
   // Create JWT session

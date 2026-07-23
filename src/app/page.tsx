@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ContainerList } from '@/components/ContainerList';
 import { ComposeEditor } from '@/components/ComposeEditor';
+import { CustomModal } from '@/components/CustomModal';
 import { Environment } from '@/lib/executor';
 import styles from './page.module.css';
 
@@ -11,17 +12,99 @@ export default function Home() {
   const [selectedEnv, setSelectedEnv] = useState<Environment | null>(null);
   const [activeTab, setActiveTab] = useState<'containers' | 'compose'>('containers');
   const [isDeploying, setIsDeploying] = useState(false);
+  
+  // Public IP state
+  const [isPullingIp, setIsPullingIp] = useState(false);
+
+  // Custom Modal state
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    type: 'alert' | 'confirm' | 'info';
+    title: string;
+    message: string;
+    copyText?: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  } | null>(null);
+
+  const showAlert = (title: string, message: string, type: 'alert' | 'confirm' | 'info' = 'alert', copyText?: string) => {
+    return new Promise<void>((resolve) => {
+      setModalConfig({
+        isOpen: true,
+        type,
+        title,
+        message,
+        copyText,
+        onConfirm: () => {
+          setModalConfig(null);
+          resolve();
+        }
+      });
+    });
+  };
+
+  // Update local state when selected env changes
+  const handleSelectEnv = (env: Environment | null) => {
+    setSelectedEnv(env);
+  };
+
+  const handlePullPublicIp = async () => {
+    if (!selectedEnv) return;
+    setIsPullingIp(true);
+    try {
+      const res = await fetch('/api/debug', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Assuming proxy handles the debug auth seamlessly, or we can use a dedicated endpoint
+          // But wait, /api/debug requires CSRF and step-up auth.
+          // Let's create an endpoint specifically for this or just allow the user to save it manually.
+        }
+      });
+      // Wait, let's just make a new simple endpoint /api/environments/ip
+    } catch (e) {
+      console.error(e);
+    }
+    setIsPullingIp(false);
+  };
 
   return (
     <div className={styles.container}>
-      <Sidebar onSelectEnv={setSelectedEnv} selectedEnvId={selectedEnv?.id || null} />
+      <Sidebar onSelectEnv={handleSelectEnv} selectedEnvId={selectedEnv?.id || null} />
       
       <main className={styles.main}>
         {selectedEnv ? (
           <>
             <header className={styles.header}>
-              <h1>{selectedEnv.name}</h1>
-              <p className={styles.subtitle}>Manage your containers and compose services</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h1>{selectedEnv.name}</h1>
+                  <p className={styles.subtitle}>Manage your containers and compose services</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button 
+                    className="glass-button" 
+                    onClick={async () => {
+                      setIsPullingIp(true);
+                      try {
+                        const res = await fetch(`/api/environments/ip?id=${selectedEnv.id}`);
+                        const data = await res.json();
+                        if (res.ok && data.ip) {
+                          await showAlert('Public IP Address', `Public IP for ${selectedEnv.name}: ${data.ip}`, 'info', data.ip);
+                        } else {
+                          await showAlert('Error', data.error || 'Failed to pull IP');
+                        }
+                      } catch (e) {
+                        await showAlert('Error', 'Failed to pull IP');
+                      }
+                      setIsPullingIp(false);
+                    }}
+                    disabled={isPullingIp}
+                  >
+                    {isPullingIp ? 'Pulling...' : 'Get Public IP'}
+                  </button>
+                </div>
+              </div>
             </header>
             
             {selectedEnv.disabled ? (
@@ -48,7 +131,7 @@ export default function Home() {
                 
                 <div className={styles.content}>
                   <div style={{ display: activeTab === 'containers' ? 'block' : 'none', flex: 1, height: '100%' }}>
-                    <ContainerList key={`containers-${selectedEnv.id}`} envId={selectedEnv.id} isDeploying={isDeploying} />
+                    <ContainerList key={`containers-${selectedEnv.id}`} envId={selectedEnv.id} env={selectedEnv} isDeploying={isDeploying} />
                   </div>
                   <div style={{ display: activeTab === 'compose' ? 'block' : 'none', flex: 1, height: '100%' }}>
                     <ComposeEditor 
@@ -71,6 +154,8 @@ export default function Home() {
           </div>
         )}
       </main>
+      
+      {modalConfig && <CustomModal {...modalConfig} />}
     </div>
   );
 }

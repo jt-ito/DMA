@@ -6,6 +6,7 @@ import { Lock } from 'lucide-react';
 import styles from './page.module.css';
 
 export default function LoginPage() {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,11 +21,11 @@ export default function LoginPage() {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
 
       if (!res.ok) {
-        throw new Error('Invalid password');
+        throw new Error('Invalid username or password');
       }
 
       router.push('/');
@@ -50,12 +51,21 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className={styles.form}>
           <div className={styles.inputGroup}>
             <input 
+              type="text" 
+              value={username} 
+              onChange={e => setUsername(e.target.value)} 
+              placeholder="Username"
+              required
+              autoFocus
+            />
+          </div>
+          <div className={styles.inputGroup}>
+            <input 
               type="password" 
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               placeholder="Password"
               required
-              autoFocus
             />
           </div>
           <button type="submit" className={`glass-button ${styles.submitBtn}`} disabled={loading}>

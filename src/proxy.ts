@@ -4,7 +4,7 @@ import { decrypt } from '@/lib/auth';
 
 const protectedRoutes = ['/'];
 
-export async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Exclude login and auth APIs from protection

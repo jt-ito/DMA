@@ -1,17 +1,29 @@
-import React, { useEffect } from 'react';
-import { AlertCircle, HelpCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, HelpCircle, Globe, Copy } from 'lucide-react';
 import styles from './CustomModal.module.css';
 
 export interface CustomModalProps {
   isOpen: boolean;
-  type: 'alert' | 'confirm';
+  type: 'alert' | 'confirm' | 'info';
   title: string;
   message: string;
   onConfirm: () => void;
   onCancel?: () => void;
+  copyText?: string;
 }
 
-export function CustomModal({ isOpen, type, title, message, onConfirm, onCancel }: CustomModalProps) {
+export function CustomModal({ isOpen, type, title, message, onConfirm, onCancel, copyText }: CustomModalProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (copyText) {
+      navigator.clipboard.writeText(copyText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
@@ -32,11 +44,19 @@ export function CustomModal({ isOpen, type, title, message, onConfirm, onCancel 
     <div className={styles.overlay} onClick={() => { if (onCancel) onCancel(); else onConfirm(); }}>
       <div className={styles.content} onClick={e => e.stopPropagation()}>
         <h3 className={styles.title}>
-          {type === 'alert' ? <AlertCircle color="var(--warning)" size={24} /> : <HelpCircle color="var(--primary)" size={24} />}
+          {type === 'alert' && <AlertCircle color="var(--warning)" size={24} />}
+          {type === 'confirm' && <HelpCircle color="var(--accent)" size={24} />}
+          {type === 'info' && <Globe color="var(--accent)" size={24} />}
           {title}
         </h3>
         <div className={styles.message}>{message}</div>
         <div className={styles.actions}>
+          {copyText && (
+            <button className={styles.button} onClick={handleCopy} style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Copy size={16} />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          )}
           {type === 'confirm' && onCancel && (
             <button className={styles.button} onClick={onCancel}>Cancel</button>
           )}

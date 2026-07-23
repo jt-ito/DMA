@@ -3,13 +3,13 @@ import { cookies } from 'next/headers';
 
 const secretKey = process.env.JWT_SECRET;
 
-if (!secretKey) {
-  throw new Error('FATAL: JWT_SECRET environment variable is not set. Refusing to start.');
-}
-
-const key = new TextEncoder().encode(secretKey);
+// Fallback to a dummy key so module evaluation doesn't crash on first-run before setup
+const key = new TextEncoder().encode(secretKey || 'unconfigured_dummy_secret_do_not_use');
 
 export async function encrypt(payload: any) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -18,6 +18,9 @@ export async function encrypt(payload: any) {
 }
 
 export async function decrypt(input: string): Promise<any> {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
   const { payload } = await jwtVerify(input, key, {
     algorithms: ['HS256'],
   });

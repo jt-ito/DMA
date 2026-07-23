@@ -161,7 +161,7 @@
             display: flex;
             flex-direction: column;
             gap: 16px;
-            overflow: hidden;
+            overflow-y: auto;
         }
 
         .console-header {
@@ -285,6 +285,66 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #71717a;
         }
+        .setup-wizard {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 400px;
+            width: 100%;
+            margin: 0 auto;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .setup-wizard.active {
+            display: flex;
+        }
+
+        .setup-wizard h2 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        
+        .setup-wizard p {
+            color: #a1a1aa;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            color: #a1a1aa;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--card-border);
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: 2px solid var(--primary);
+            border-color: transparent;
+        }
+        
+        .error-message {
+            color: var(--danger);
+            font-size: 13px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -293,7 +353,7 @@
             <div class="brand-icon">DM</div>
             <div>
                 <h1>Docker Manager</h1>
-                <p>Background Server Running</p>
+                <p id="headerStatus">Checking configuration...</p>
             </div>
         </div>
         <div class="actions">
@@ -301,18 +361,48 @@
                 <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
                 <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
             </button>
-            <button class="btn-primary" id="openBrowserBtn">Open Web UI</button>
-            <button class="btn-danger" id="stopServerBtn">Stop Server</button>
+            <button class="btn-primary" id="openBrowserBtn" style="display: none;">Open Web UI</button>
+            <button class="btn-danger" id="stopServerBtn" style="display: none;">Stop Server</button>
         </div>
     </header>
 
     <main>
-        <div class="console-header">
-            <div class="status-dot"></div> Server Console
+        <div class="setup-wizard" id="setupWizard">
+            <h2>Welcome to Docker Manager</h2>
+            <p>Please configure your initial administrator credentials and backend port.</p>
+            <div class="error-message" id="setupError"></div>
+            
+            <div class="form-group">
+                <label for="setupUsername">Username</label>
+                <input type="text" id="setupUsername" value="admin" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="setupPassword">Password</label>
+                <input type="password" id="setupPassword" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="setupConfirmPassword">Confirm Password</label>
+                <input type="password" id="setupConfirmPassword" required>
+            </div>
+
+            <div class="form-group">
+                <label for="setupPort">Server Port</label>
+                <input type="number" id="setupPort" value="3000" min="1" max="65535" required>
+            </div>
+
+            <button class="btn-primary" id="completeSetupBtn" style="margin-top: 8px;">Complete Setup</button>
         </div>
-        <div class="console" id="consoleOutput">
-            <div class="log-line">Initializing Docker Manager...</div>
-            <div class="log-line">Starting Next.js Server...</div>
+
+        <div id="consoleContainer" style="display: none; flex-direction: column; flex: 1; overflow: hidden; gap: 16px;">
+            <div class="console-header">
+                <div class="status-dot"></div> Server Console
+            </div>
+            <div class="console" id="consoleOutput">
+                <div class="log-line">Initializing Docker Manager...</div>
+                <div class="log-line">Starting Next.js Server...</div>
+            </div>
         </div>
     </main>
 
@@ -401,6 +491,69 @@
             modal.classList.remove('active');
             invoke('close_app');
         });
+
+        // App Boot Logic
+        async function bootApp() {
+            try {
+                const isConfigured = await invoke('is_configured');
+                if (isConfigured) {
+                    showConsole();
+                    invoke('start_server');
+                } else {
+                    document.getElementById('headerStatus').textContent = 'Initial Setup Required';
+                    document.getElementById('setupWizard').classList.add('active');
+                }
+            } catch (e) {
+                appendLog('Error checking configuration: ' + e);
+            }
+        }
+
+        function showConsole() {
+            document.getElementById('setupWizard').classList.remove('active');
+            document.getElementById('consoleContainer').style.display = 'flex';
+            document.getElementById('headerStatus').textContent = 'Background Server Running';
+            document.getElementById('openBrowserBtn').style.display = 'block';
+            document.getElementById('stopServerBtn').style.display = 'block';
+        }
+
+        document.getElementById('completeSetupBtn').addEventListener('click', async () => {
+            const username = document.getElementById('setupUsername').value;
+            const password = document.getElementById('setupPassword').value;
+            const confirmPassword = document.getElementById('setupConfirmPassword').value;
+            const port = document.getElementById('setupPort').value;
+            const errorMsg = document.getElementById('setupError');
+
+            if (password !== confirmPassword) {
+                errorMsg.textContent = 'Passwords do not match';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (password.length < 4) {
+                errorMsg.textContent = 'Password must be at least 4 characters';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('completeSetupBtn');
+                btn.textContent = 'Saving...';
+                btn.disabled = true;
+
+                await invoke('complete_setup', { username, password, port });
+                
+                showConsole();
+                invoke('start_server');
+            } catch (e) {
+                errorMsg.textContent = e;
+                errorMsg.style.display = 'block';
+                document.getElementById('completeSetupBtn').textContent = 'Complete Setup';
+                document.getElementById('completeSetupBtn').disabled = false;
+            }
+        });
+
+        // Start Boot sequence
+        bootApp();
     </script>
 </body>
 </html>

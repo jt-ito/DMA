@@ -5,10 +5,12 @@ import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, D
 import { DockerContainer } from '@/lib/docker';
 import { CustomModal } from './CustomModal';
 import { RemoteFileBrowser } from './RemoteFileBrowser';
+import { Environment } from '@/lib/executor';
 import styles from './ContainerList.module.css';
 
 interface Props {
   envId: string;
+  env: Environment;
   isDeploying?: boolean;
 }
 
@@ -29,7 +31,7 @@ function formatExactUptime(startedAt: string): string {
   return parts.join(', ');
 }
 
-export function ContainerList({ envId, isDeploying }: Props) {
+export function ContainerList({ envId, env, isDeploying }: Props) {
   // Initialize state directly from global cache so there is absolutely no flash
   const initialCache = globalCache[envId];
   
@@ -500,6 +502,39 @@ export function ContainerList({ envId, isDeploying }: Props) {
                   <td className={styles.nameCell}>
                     <strong>{c.Names}</strong>
                     <span className={styles.idText}>{c.ID.substring(0, 12)}</span>
+                    {(() => {
+                      if (!c.Ports) return null;
+                      const ip = env.type === 'local' ? 'localhost' : (env.host || 'localhost');
+                      const parts = c.Ports.split(', ');
+                      const publishedPorts: { hostPort: string, fullPart: string }[] = [];
+                      for (const part of parts) {
+                        if (part.includes('->')) {
+                          const [hostPart] = part.split('->');
+                          const hostIpAndPort = hostPart.split(':');
+                          const hostPort = hostIpAndPort[hostIpAndPort.length - 1];
+                          if (!publishedPorts.find(p => p.hostPort === hostPort)) {
+                            publishedPorts.push({ hostPort, fullPart: part });
+                          }
+                        }
+                      }
+                      if (publishedPorts.length === 0) return null;
+                      return (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.25rem' }}>
+                          {publishedPorts.map(p => (
+                            <a 
+                              key={p.hostPort} 
+                              href={`http://${ip}:${p.hostPort}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className={styles.portLink}
+                              title={p.fullPart}
+                            >
+                              {p.hostPort}
+                            </a>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
