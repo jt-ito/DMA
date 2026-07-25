@@ -32,7 +32,8 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
     inspectOut = res.stdout;
   } catch (e: any) {
     inspectOut = e.stdout || '';
-    console.warn("Partial failure inspecting containers:", e);
+    const errMsg = e.stderr?.trim() || e.message || String(e);
+    console.warn(`Partial failure inspecting containers: ${errMsg}`);
   }
 
   const inspectLines = inspectOut.trim().split('\n').filter(line => line.length > 0);
