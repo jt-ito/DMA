@@ -27,6 +27,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelection = useRef<{ start: number; end: number } | null>(null);
+  const lastSavedContentRef = useRef<string>('');
 
   useEffect(() => {
     if (pendingSelection.current && textareaRef.current) {
@@ -57,14 +58,20 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
               const fileData = await fileRes.json();
               if (fileRes.ok && fileData.content) {
                 setYamlContent(fileData.content);
+                lastSavedContentRef.current = fileData.content;
               } else if (envData.composeYaml) {
                 setYamlContent(envData.composeYaml); // fallback
+                lastSavedContentRef.current = envData.composeYaml;
               }
             } catch (e) {
-              if (envData.composeYaml) setYamlContent(envData.composeYaml);
+              if (envData.composeYaml) {
+                setYamlContent(envData.composeYaml);
+                lastSavedContentRef.current = envData.composeYaml;
+              }
             }
           } else if (envData.composeYaml) {
             setYamlContent(envData.composeYaml);
+            lastSavedContentRef.current = envData.composeYaml;
           }
           if (envData.pruneImagesOnDeploy !== undefined) {
             setPruneImages(envData.pruneImagesOnDeploy);
@@ -77,6 +84,55 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
     };
     fetchEnv();
   }, [envId]);
+
+  useEffect(() => {
+    if (!loadedFilePath) return;
+
+    // Polling for external changes
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch('/api/fs/read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ envId, path: loadedFilePath })
+        });
+        const data = await res.json();
+        if (res.ok && data.content !== undefined) {
+          if (data.content !== lastSavedContentRef.current) {
+            // File changed on disk! Update editor to match disk
+            lastSavedContentRef.current = data.content;
+            setYamlContent(data.content);
+          }
+        }
+      } catch (e) {
+        // ignore errors in polling
+      }
+    }, 2000); // 2 second polling
+
+    return () => clearInterval(intervalId);
+  }, [envId, loadedFilePath]);
+
+  useEffect(() => {
+    if (!loadedFilePath || yamlContent === lastSavedContentRef.current) return;
+
+    // Auto-save changes made in editor to disk
+    const timeoutId = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/fs/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ envId, path: loadedFilePath, content: yamlContent })
+        });
+        if (res.ok) {
+          lastSavedContentRef.current = yamlContent;
+        }
+      } catch (e) {
+        // ignore errors in auto-save
+      }
+    }, 800); // 800ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [yamlContent, envId, loadedFilePath]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

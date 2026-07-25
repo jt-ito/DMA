@@ -116,6 +116,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .actionBtn:hover {
@@ -287,9 +288,6 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 50;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   border-radius: 12px;
 }
 
@@ -301,6 +299,10 @@
   text-align: center;
   box-shadow: 0 20px 40px rgba(0,0,0,0.4);
   max-width: 400px;
+  margin: 0 auto;
+  position: sticky;
+  top: 50vh;
+  transform: translateY(-50%);
 }
 
 .deployOverlayContent h2 {
