@@ -40,6 +40,11 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   const [error, setError] = useState<string | null>(initialCache?.error || null);
   const [granularStates, setGranularStates] = useState<Record<string, string>>({});
 
+  const granularStatesRef = useRef(granularStates);
+  useEffect(() => {
+    granularStatesRef.current = granularStates;
+  }, [granularStates]);
+
   // Logs state
   const [logsModalOpen, setLogsModalOpen] = useState(false);
   const [currentLogs, setCurrentLogs] = useState<string>('');
@@ -170,9 +175,27 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
           throw new Error(data.error || 'Failed to fetch containers');
         }
         if (Array.isArray(data)) {
-          setContainers(data);
+          setContainers(prev => {
+            const nextContainers = [...data];
+            const nextNames = new Set(data.map((c: DockerContainer) => c.Names));
+            
+            for (const p of prev) {
+              if (!nextNames.has(p.Names) && granularStatesRef.current[p.Names]) {
+                nextContainers.push(p);
+              }
+            }
+            
+            nextContainers.sort((a, b) => {
+              const projA = a.Project || '';
+              const projB = b.Project || '';
+              if (projA !== projB) return projA.localeCompare(projB);
+              return a.Names.localeCompare(b.Names);
+            });
+            
+            globalCache[envId] = { data: nextContainers };
+            return nextContainers;
+          });
           setError(null);
-          globalCache[envId] = { data };
         }
         setLoading(false);
       })
@@ -203,14 +226,14 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     }
   }, [isDeploying, fetchContainers]);
 
-  const setContainerState = (id: string, state: string | null) => {
+  const setContainerState = (name: string, state: string | null) => {
     setGranularStates(prev => {
       if (state === null) {
         const copy = { ...prev };
-        delete copy[id];
+        delete copy[name];
         return copy;
       }
-      return { ...prev, [id]: state };
+      return { ...prev, [name]: state };
     });
   };
 
@@ -227,26 +250,26 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     return res;
   };
 
-  const handleAction = async (containerId: string, action: string) => {
+  const handleAction = async (container: DockerContainer, action: string) => {
     const stateMapping: Record<string, string> = { start: 'starting', stop: 'stopping', restart: 'restarting', remove: 'removing' };
-    setContainerState(containerId, stateMapping[action] || 'updating');
+    setContainerState(container.Names, stateMapping[action] || 'updating');
     try {
-      await apiPost('/api/containers', { envId, containerId, action });
+      await apiPost('/api/containers', { envId, containerId: container.ID, action });
       fetchContainers();
     } catch (e) {
       console.error(e);
       showAlert('Action Failed', `${e instanceof Error ? e.message : String(e)}`);
     }
-    setContainerState(containerId, null);
+    setContainerState(container.Names, null);
   };
 
   const handleDownCompose = async (container: DockerContainer) => {
     if (!container.WorkingDir || !container.Service) return;
     try {
-      setContainerState(container.ID, 'stopping');
+      setContainerState(container.Names, 'stopping');
       await apiPost('/api/compose', { action: 'stop', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles });
       
-      setContainerState(container.ID, 'removing');
+      setContainerState(container.Names, 'removing');
       await apiPost('/api/compose', { action: 'rm -f', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles });
       
       fetchContainers();
@@ -254,30 +277,30 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       console.error(e);
       showAlert('Down Failed', `${e instanceof Error ? e.message : String(e)}`);
     }
-    setContainerState(container.ID, null);
+    setContainerState(container.Names, null);
   };
 
   const handleUpdateCompose = async (container: DockerContainer, skipFetch = false) => {
     if (!container.WorkingDir || !container.Service) return;
     try {
       // 1. Stop
-      setContainerState(container.ID, 'stopping');
+      setContainerState(container.Names, 'stopping');
       await apiPost('/api/compose', { action: 'stop', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles }).catch(e => { throw new Error('Stop step failed:\n' + e.message) });
       
       // 2. Remove container
-      setContainerState(container.ID, 'removing');
+      setContainerState(container.Names, 'removing');
       await apiPost('/api/compose', { action: 'rm -f', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles }).catch(e => { throw new Error('Remove container step failed:\n' + e.message) });
 
       // 3. Delete the image explicitly
-      setContainerState(container.ID, 'cleaning');
+      setContainerState(container.Names, 'cleaning');
       await apiPost('/api/compose', { action: 'rmi', envId, imageName: container.Image }).catch(e => { throw new Error('Remove image step failed:\n' + e.message) });
       
       // 4. Pull
-      setContainerState(container.ID, 'pulling');
+      setContainerState(container.Names, 'pulling');
       await apiPost('/api/compose', { action: 'pull --ignore-pull-failures', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles }).catch(e => { throw new Error('Pull step failed:\n' + e.message) });
       
       // 5. Start
-      setContainerState(container.ID, 'starting');
+      setContainerState(container.Names, 'starting');
       await apiPost('/api/compose', { action: 'up -d', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles }).catch(e => { throw new Error('Start step failed:\n' + e.message) });
       
       if (!skipFetch) fetchContainers();
@@ -285,7 +308,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       console.error(e);
       showAlert(`Update Failed for ${container.Names}`, `${e instanceof Error ? e.message : String(e)}`);
     }
-    setContainerState(container.ID, null);
+    setContainerState(container.Names, null);
   };
 
   const handleUpdateAll = async () => {
@@ -338,7 +361,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
        return;
     }
     
-    const uniqueProjects = new Map<string, { WorkingDir: string, ConfigFiles?: string, EnvironmentFiles?: string, containerIds: string[] }>();
+    const uniqueProjects = new Map<string, { WorkingDir: string, ConfigFiles?: string, EnvironmentFiles?: string, containerNames: string[] }>();
     for (const c of composeContainers) {
       if (!c.WorkingDir) continue;
       if (!uniqueProjects.has(c.WorkingDir)) {
@@ -346,10 +369,10 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
           WorkingDir: c.WorkingDir,
           ConfigFiles: c.ConfigFiles,
           EnvironmentFiles: c.EnvironmentFiles,
-          containerIds: []
+          containerNames: []
         });
       }
-      uniqueProjects.get(c.WorkingDir)!.containerIds.push(c.ID);
+      uniqueProjects.get(c.WorkingDir)!.containerNames.push(c.Names);
     }
     const projects = Array.from(uniqueProjects.values());
 
@@ -363,26 +386,26 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       // 1. Down all projects
       setUpdateAllStatus('Stopping projects...');
       for (const p of projects) {
-        p.containerIds.forEach(id => setContainerState(id, 'stopping'));
+        p.containerNames.forEach(name => setContainerState(name, 'stopping'));
         await apiPost('/api/compose', { action: 'down', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
       }
 
       // 2. System prune
       setUpdateAllStatus('Pruning old images and containers...');
-      projects.forEach(p => p.containerIds.forEach(id => setContainerState(id, 'cleaning')));
+      projects.forEach(p => p.containerNames.forEach(name => setContainerState(name, 'cleaning')));
       await apiPost('/api/compose', { action: 'system-prune', envId });
 
       // 3. Pull all projects
       setUpdateAllStatus('Pulling new images (this may take a while)...');
       for (const p of projects) {
-        p.containerIds.forEach(id => setContainerState(id, 'pulling'));
+        p.containerNames.forEach(name => setContainerState(name, 'pulling'));
         await apiPost('/api/compose', { action: 'pull --ignore-pull-failures', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
       }
 
       // 4. Up all projects
       setUpdateAllStatus('Starting projects...');
       for (const p of projects) {
-        p.containerIds.forEach(id => setContainerState(id, 'starting'));
+        p.containerNames.forEach(name => setContainerState(name, 'starting'));
         await apiPost('/api/compose', { action: 'up -d', envId, workingDir: p.WorkingDir, configFiles: p.ConfigFiles, environmentFiles: p.EnvironmentFiles });
       }
     } catch (e) {
@@ -390,7 +413,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       showAlert('Update All Failed', `${e instanceof Error ? e.message : String(e)}`);
     }
 
-    projects.forEach(p => p.containerIds.forEach(id => setContainerState(id, null)));
+    projects.forEach(p => p.containerNames.forEach(name => setContainerState(name, null)));
     fetchContainers();
     setUpdatingAll(false);
   };
@@ -481,7 +504,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
           </thead>
           <tbody>
             {containers.map(c => {
-              const granularState = granularStates[c.ID];
+              const granularState = granularStates[c.Names];
               const displayState = granularState || c.State;
               const isRunning = displayState === 'running';
               const isCompose = c.Project && c.Service && c.WorkingDir;
@@ -498,7 +521,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                 'badge-danger';
               
               return (
-                <tr key={c.ID} className={isLoading ? styles.loadingRow : ''}>
+                <tr key={c.Names} className={isLoading ? styles.loadingRow : ''}>
                   <td className={styles.nameCell}>
                     <strong>{c.Names}</strong>
                     <span className={styles.idText}>{c.ID.substring(0, 12)}</span>
@@ -560,20 +583,20 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                   <td>
                     <div className={styles.actions}>
                       {isRunning ? (
-                        <button title="Stop" className={styles.actionBtn} onClick={() => handleAction(c.ID, 'stop')} disabled={isLoading}>
+                        <button title="Stop" className={styles.actionBtn} onClick={() => handleAction(c, 'stop')} disabled={isLoading}>
                           <Square size={16} />
                         </button>
                       ) : (
-                        <button title="Start" className={styles.actionBtn} onClick={() => handleAction(c.ID, 'start')} disabled={isLoading}>
+                        <button title="Start" className={styles.actionBtn} onClick={() => handleAction(c, 'start')} disabled={isLoading}>
                           <Play size={16} />
                         </button>
                       )}
                       
-                      <button title="Restart" className={styles.actionBtn} onClick={() => handleAction(c.ID, 'restart')} disabled={isLoading}>
+                      <button title="Restart" className={styles.actionBtn} onClick={() => handleAction(c, 'restart')} disabled={isLoading}>
                         <RotateCcw size={16} />
                       </button>
                       
-                      <button title="Remove" className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleAction(c.ID, 'remove')} disabled={isLoading}>
+                      <button title="Remove" className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleAction(c, 'remove')} disabled={isLoading}>
                         <Trash2 size={16} />
                       </button>
                       
