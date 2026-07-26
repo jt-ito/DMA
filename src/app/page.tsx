@@ -141,7 +141,12 @@ export default function Home() {
                         setIsDeploying(true);
                         setActiveTab('containers');
                       }}
-                      onDeployEnd={() => setIsDeploying(false)}
+                      onDeployEnd={(success) => {
+                        setIsDeploying(false);
+                        if (!success) {
+                          setActiveTab('compose');
+                        }
+                      }}
                     />
                   </div>
                 </div>

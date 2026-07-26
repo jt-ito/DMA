@@ -176,19 +176,20 @@ fn update_settings(username: String, password: Option<String>, port: String) -> 
 
 #[cfg(target_os = "windows")]
 fn kill_port_process(port: &str) {
-    if let Ok(output) = std::process::Command::new("netstat")
-        .args(["-ano"])
-        .output()
-    {
+    let mut netstat = std::process::Command::new("netstat");
+    netstat.args(["-ano"]);
+    netstat.creation_flags(0x08000000);
+    if let Ok(output) = netstat.output() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let search_str = format!(":{}", port);
         for line in stdout.lines() {
             if line.contains(&search_str) && line.contains("LISTENING") {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if let Some(pid) = parts.last() {
-                    let _ = std::process::Command::new("taskkill")
-                        .args(["/F", "/T", "/PID", pid])
-                        .status();
+                    let mut taskkill = std::process::Command::new("taskkill");
+                    taskkill.args(["/F", "/T", "/PID", pid]);
+                    taskkill.creation_flags(0x08000000);
+                    let _ = taskkill.status();
                 }
             }
         }
@@ -337,16 +338,40 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
+fn kill_process_tree(pid: u32) {
+    use sysinfo::System;
+    let mut sys = System::new_all();
+    sys.refresh_all();
+    
+    let mut to_kill = vec![pid];
+    let mut new_found = true;
+    while new_found {
+        new_found = false;
+        for (process_pid, process) in sys.processes() {
+            if let Some(parent) = process.parent() {
+                if to_kill.contains(&parent.as_u32()) && !to_kill.contains(&process_pid.as_u32()) {
+                    to_kill.push(process_pid.as_u32());
+                    new_found = true;
+                }
+            }
+        }
+    }
+    
+    for pid_to_kill in to_kill.iter().rev() {
+        if let Some(process) = sys.process(sysinfo::Pid::from_u32(*pid_to_kill)) {
+            process.kill();
+        }
+    }
+}
+
 #[tauri::command]
 fn stop_server(state: tauri::State<AppState>) -> Result<(), String> {
     if let Ok(mut child_opt) = state.child.lock() {
         if let Some(child) = child_opt.as_mut() {
             #[cfg(target_os = "windows")]
             {
-                let pid = child.id();
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .status();
+                kill_process_tree(child.id());
             }
             #[cfg(not(target_os = "windows"))]
             {
@@ -370,10 +395,7 @@ fn close_app(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<(),
         if let Some(child) = child_opt.as_mut() {
             #[cfg(target_os = "windows")]
             {
-                let pid = child.id();
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .status();
+                kill_process_tree(child.id());
             }
             #[cfg(not(target_os = "windows"))]
             {
@@ -395,6 +417,12 @@ fn open_browser() -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }))
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .invoke_handler(tauri::generate_handler![
         is_configured,
@@ -450,10 +478,7 @@ pub fn run() {
                       if let Some(child) = child_opt.as_mut() {
                           #[cfg(target_os = "windows")]
                           {
-                              let pid = child.id();
-                              let _ = std::process::Command::new("taskkill")
-                                  .args(["/F", "/T", "/PID", &pid.to_string()])
-                                  .status();
+                              kill_process_tree(child.id());
                           }
                           #[cfg(not(target_os = "windows"))]
                           {

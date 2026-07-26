@@ -148,21 +148,34 @@ export async function removeImage(env: Environment, image: string): Promise<void
 
 export async function getContainerLogs(env: Environment, id: string): Promise<string> {
   try {
-    const { stdout, stderr } = await executeCommand(env, 'docker', ['logs', '--timestamps', '--tail', '200', id]);
-    return stdout + (stderr ? '\n' + stderr : '');
+    // Increased tail to 1000 and added --details for verbosity
+    const { stdout, stderr } = await executeCommand(env, 'docker', ['logs', '--timestamps', '--tail', '1000', '--details', id]);
+    
+    // Split into lines, combine, and sort chronologically based on the docker timestamp prefix
+    const outLines = stdout.split('\n').filter(l => l.trim().length > 0);
+    const errLines = stderr.split('\n').filter(l => l.trim().length > 0);
+    const allLines = [...outLines, ...errLines];
+    
+    allLines.sort((a, b) => {
+      const timeA = a.substring(0, a.indexOf(' '));
+      const timeB = b.substring(0, b.indexOf(' '));
+      return timeA.localeCompare(timeB);
+    });
+    
+    return allLines.join('\n');
   } catch (e: any) {
     return e.message || String(e);
   }
 }
 
-export async function deployCompose(env: Environment, yamlContent: string, composeFilePath?: string, pruneImages?: boolean): Promise<void> {
+export async function deployCompose(env: Environment, yamlContent: string, composeFilePath?: string, pruneImages?: boolean, envFilePath?: string): Promise<void> {
   if (composeFilePath) {
     const isWindows = composeFilePath.includes('\\');
     const separator = isWindows ? '\\' : '/';
     const dir = composeFilePath.substring(0, composeFilePath.lastIndexOf(separator));
     
     if (pruneImages) {
-      await composeCommand(env, 'down --rmi all', dir, undefined, composeFilePath);
+      await composeCommand(env, 'down --rmi all', dir, undefined, composeFilePath, envFilePath);
     }
     
     if (env.type === 'local') {
@@ -174,8 +187,8 @@ export async function deployCompose(env: Environment, yamlContent: string, compo
       await executeCommand(env, `cat << '${delimiter}' > "${composeFilePath}"\n${yamlContent}\n${delimiter}`);
     }
     
-    await composeCommand(env, 'pull --ignore-pull-failures', dir, undefined, composeFilePath);
-    await composeCommand(env, 'up -d --remove-orphans', dir, undefined, composeFilePath);
+    await composeCommand(env, 'pull -q --ignore-pull-failures', dir, undefined, composeFilePath, envFilePath);
+    await composeCommand(env, 'up -d --quiet-pull --remove-orphans', dir, undefined, composeFilePath, envFilePath);
   } else {
     const tempFileName = `docker-compose-temp-${Date.now()}.yml`;
     if (env.type === 'local') {

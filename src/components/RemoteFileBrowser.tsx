@@ -13,9 +13,10 @@ interface Props {
   envId: string;
   onClose: () => void;
   onFileSelect: (content: string, filePath?: string) => void;
+  allowedExtensions?: string[];
 }
 
-export function RemoteFileBrowser({ envId, onClose, onFileSelect }: Props) {
+export function RemoteFileBrowser({ envId, onClose, onFileSelect, allowedExtensions = ['.yml', '.yaml'] }: Props) {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(`lastRemotePath-${envId}`) || '~';
@@ -60,9 +61,9 @@ export function RemoteFileBrowser({ envId, onClose, onFileSelect }: Props) {
       setCurrentPath(newPath);
       localStorage.setItem(`lastRemotePath-${envId}`, newPath);
     } else {
-      // Is a file, check if yml/yaml
-      if (!item.name.endsWith('.yml') && !item.name.endsWith('.yaml')) {
-        // Technically we can disable them in UI, but just in case
+      // Is a file, check extensions
+      const ext = item.name.substring(item.name.lastIndexOf('.'));
+      if (allowedExtensions.length > 0 && !allowedExtensions.includes(ext) && !allowedExtensions.includes(item.name)) {
         return;
       }
       // Read file
@@ -102,7 +103,7 @@ export function RemoteFileBrowser({ envId, onClose, onFileSelect }: Props) {
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h3><HardDrive size={20} /> Browse Remote File</h3>
+          <h3><HardDrive size={20} /> Select Compose File</h3>
           <button className={styles.closeBtn} onClick={onClose}>
             <X size={20} />
           </button>
@@ -127,7 +128,8 @@ export function RemoteFileBrowser({ envId, onClose, onFileSelect }: Props) {
         ) : (
           <ul className={styles.fileList}>
             {items.map(item => {
-              const isSelectableFile = !item.isDir && (item.name.endsWith('.yml') || item.name.endsWith('.yaml'));
+              const ext = item.name.substring(item.name.lastIndexOf('.'));
+              const isSelectableFile = !item.isDir && (allowedExtensions.length === 0 || allowedExtensions.includes(ext) || allowedExtensions.includes(item.name));
               const disabled = !item.isDir && !isSelectableFile;
               
               return (

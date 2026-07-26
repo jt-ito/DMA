@@ -164,3 +164,27 @@ input:checked + .slider:before {
   border-radius: 8px;
   color: var(--success);
 }
+
+.envFileContainer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.input {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-glass);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  outline: none;
+  flex: 1;
+  min-width: 200px;
+}
+
+.input:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+}

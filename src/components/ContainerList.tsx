@@ -50,12 +50,20 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   const [currentLogs, setCurrentLogs] = useState<string>('');
   const [logsLoading, setLogsLoading] = useState(false);
   const [selectedContainerName, setSelectedContainerName] = useState<string>('');
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [updatingAll, setUpdatingAll] = useState(false);
   const [updateAllStatus, setUpdateAllStatus] = useState<string>('');
   const logsContainerRef = useRef<HTMLPreElement>(null);
   
   const [remoteBrowserOpen, setRemoteBrowserOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [browserTarget, setBrowserTarget] = useState<'compose' | 'env'>('compose');
+  
+  const [deployConfigOpen, setDeployConfigOpen] = useState(false);
+  const [deployConfig, setDeployConfig] = useState({
+    composeFilePath: '',
+    composeFileContent: '',
+    envFilePath: ''
+  });
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -100,33 +108,6 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     });
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      if (event.target?.result) {
-        const yamlContent = event.target.result as string;
-        setUpdatingAll(true);
-        setUpdateAllStatus('Pulling and deploying selected file...');
-        try {
-          await apiPost('/api/compose/deploy', { 
-            envId, 
-            yamlContent,
-          });
-          showAlert('Success', 'Successfully deployed compose project.');
-        } catch (error: any) {
-          showAlert('Deploy Failed', error.message);
-        }
-        fetchContainers();
-        setUpdatingAll(false);
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   const handleCopyLogs = async () => {
     try {
       await navigator.clipboard.writeText(currentLogs);
@@ -168,7 +149,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       setContainers([]);
     }
 
-    fetch(`/api/containers?envId=${envId}`)
+    fetch(`/api/containers?envId=${envId}`, { cache: 'no-store' })
       .then(async res => {
         const data = await res.json();
         if (!res.ok) {
@@ -251,6 +232,16 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   };
 
   const handleAction = async (container: DockerContainer, action: string) => {
+    if (action === 'remove' || action === 'stop') {
+      const isRemove = action === 'remove';
+      const confirmed = await showConfirm(
+        isRemove ? 'Remove Container' : 'Stop Container',
+        isRemove 
+          ? `Are you sure you want to permanently remove "${container.Names}"? This action cannot be undone.`
+          : `Are you sure you want to stop "${container.Names}"?`
+      );
+      if (!confirmed) return;
+    }
     const stateMapping: Record<string, string> = { start: 'starting', stop: 'stopping', restart: 'restarting', remove: 'removing' };
     setContainerState(container.Names, stateMapping[action] || 'updating');
     try {
@@ -265,6 +256,13 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
 
   const handleDownCompose = async (container: DockerContainer) => {
     if (!container.WorkingDir || !container.Service) return;
+    
+    const confirmed = await showConfirm(
+      'Down Compose Service',
+      `Are you sure you want to take down the compose service for "${container.Project || container.Names}"? This will stop and remove all related containers, networks, and volumes defined in the compose file.`
+    );
+    if (!confirmed) return;
+
     try {
       setContainerState(container.Names, 'stopping');
       await apiPost('/api/compose', { action: 'stop', envId, workingDir: container.WorkingDir, serviceName: container.Service, configFiles: container.ConfigFiles, environmentFiles: container.EnvironmentFiles });
@@ -282,6 +280,13 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
 
   const handleUpdateCompose = async (container: DockerContainer, skipFetch = false) => {
     if (!container.WorkingDir || !container.Service) return;
+    
+    const confirmed = await showConfirm(
+      'Update Compose Service',
+      `Are you sure you want to pull the latest image and recreate the service "${container.Service}"?`
+    );
+    if (!confirmed) return;
+
     try {
       // 1. Stop
       setContainerState(container.Names, 'stopping');
@@ -311,47 +316,30 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     setContainerState(container.Names, null);
   };
 
+  const handleOpenDeployConfig = async () => {
+    try {
+      const res = await fetch(`/api/environments`);
+      const envs = await res.json();
+      const currentEnv = envs.find((e: any) => e.id === envId) || env;
+
+      setDeployConfig({
+        composeFilePath: currentEnv.composeFilePath || '',
+        composeFileContent: currentEnv.composeYaml || '',
+        envFilePath: currentEnv.envFilePath || ''
+      });
+      setDeployConfigOpen(true);
+    } catch (e: any) {
+      setDeployConfig({
+        composeFilePath: env.composeFilePath || '',
+        composeFileContent: env.composeYaml || '',
+        envFilePath: env.envFilePath || ''
+      });
+      setDeployConfigOpen(true);
+    }
+  };
+
   const handleUpdateAll = async () => {
     if (containers.length === 0) {
-      // Pull All flow
-      try {
-        const res = await fetch(`/api/environments`);
-        const envs = await res.json();
-        const env = envs.find((e: any) => e.id === envId);
-        if (!env) {
-          showAlert('Error', 'Environment not found.');
-          return;
-        }
-
-        if (env.composeFilePath || env.composeYaml) {
-          // File is configured, just deploy it
-          setUpdatingAll(true);
-          setUpdateAllStatus('Pulling and deploying compose project...');
-          try {
-            await apiPost('/api/compose/deploy', { 
-              envId, 
-              yamlContent: env.composeYaml || '', 
-              composeFilePath: env.composeFilePath,
-              pruneImages: env.pruneImagesOnDeploy 
-            });
-            showAlert('Success', 'Successfully deployed compose project.');
-          } catch (e: any) {
-            showAlert('Deploy Failed', e.message);
-          }
-          fetchContainers();
-          setUpdatingAll(false);
-          return;
-        }
-
-        // Need file picker
-        if (env.type === 'local') {
-          fileInputRef.current?.click();
-        } else {
-          setRemoteBrowserOpen(true);
-        }
-      } catch (e: any) {
-        showAlert('Error', 'Failed to fetch environment details.');
-      }
       return;
     }
 
@@ -420,6 +408,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
 
   const handleViewLogs = async (container: DockerContainer) => {
     setSelectedContainerName(container.Names);
+    setSelectedContainerId(container.ID);
     setCurrentLogs('');
     setLogsLoading(true);
     setLogsModalOpen(true);
@@ -436,6 +425,30 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     }
     setLogsLoading(false);
   };
+
+  useEffect(() => {
+    if (!logsModalOpen || !selectedContainerId) return;
+
+    let isActive = true;
+
+    const pollLogs = async () => {
+      try {
+        const res = await fetch(`/api/logs?envId=${envId}&containerId=${selectedContainerId}`);
+        const data = await res.json();
+        if (isActive && res.ok && data.logs) {
+           setCurrentLogs(data.logs);
+        }
+      } catch (e) {
+        // silently ignore polling errors
+      }
+    };
+
+    const intervalId = setInterval(pollLogs, 3000);
+    return () => {
+      isActive = false;
+      clearInterval(intervalId);
+    };
+  }, [logsModalOpen, selectedContainerId, envId]);
 
   if (loading && containers.length === 0) return <div className={styles.loading}>Loading containers...</div>;
 
@@ -455,14 +468,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   return (
     <div className={`glass-panel ${styles.panel}`}>
       
-      <input 
-        type="file" 
-        accept=".yml,.yaml" 
-        ref={fileInputRef} 
-        style={{ display: 'none' }} 
-        onChange={handleFileChange}
-      />
-      
+
       { (isDeploying || updatingAll) && (
         <div className={styles.deployOverlay}>
           <div className={styles.deployOverlayContent}>
@@ -476,14 +482,15 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       <div className={styles.panelHeader}>
         <h3>Containers</h3>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
+
           <button 
             className="glass-button" 
             onClick={handleUpdateAll} 
-            disabled={updatingAll || (loading && containers.length === 0)}
+            disabled={updatingAll || containers.length === 0}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <RefreshCw size={16} className={updatingAll ? styles.spin : ''} /> 
-            {updatingAll ? 'Updating...' : (containers.length === 0 ? 'Pull All' : 'Update All')}
+            {updatingAll ? 'Updating...' : 'Update All'}
           </button>
           <button className="glass-button" onClick={() => fetchContainers(true)} disabled={updatingAll}>
             Refresh
@@ -671,26 +678,73 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
         </div>
       )}
 
+      {deployConfigOpen && (
+        <div className={styles.modalOverlay} onClick={() => setDeployConfigOpen(false)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className={styles.modalHeader}>
+              <h3>Deploy Compose Stack</h3>
+              <button className={styles.closeBtn} onClick={() => setDeployConfigOpen(false)}><X size={20} /></button>
+            </div>
+            <div className={styles.modalBody}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Compose File</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input type="text" readOnly value={deployConfig.composeFilePath || 'None Selected'} className={styles.input} style={{ flex: 1, backgroundColor: 'var(--bg-secondary)' }} />
+                  <button className="glass-button" onClick={() => { setBrowserTarget('compose'); setRemoteBrowserOpen(true); }}>Browse</button>
+                </div>
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Environment File (.env) (Optional)</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input type="text" readOnly value={deployConfig.envFilePath || 'Auto-detected'} className={styles.input} style={{ flex: 1, backgroundColor: 'var(--bg-secondary)' }} />
+                  <button className="glass-button" onClick={() => { setBrowserTarget('env'); setRemoteBrowserOpen(true); }}>Browse</button>
+                </div>
+                <small style={{ display: 'block', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
+                  Docker Compose will automatically detect a .env file located in the same directory as the Compose file. Use this if your .env file is located elsewhere or is not detected automatically.
+                </small>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
+                <button className="glass-button" onClick={() => setDeployConfigOpen(false)}>Cancel</button>
+                <button 
+                  className={`glass-button ${styles.primary}`} 
+                  disabled={!deployConfig.composeFilePath}
+                  onClick={async () => {
+                    setDeployConfigOpen(false);
+                    setUpdatingAll(true);
+                    setUpdateAllStatus('Pulling and deploying selected configuration...');
+                    try {
+                      await apiPost('/api/compose/deploy', { 
+                        envId, 
+                        yamlContent: deployConfig.composeFileContent,
+                        composeFilePath: deployConfig.composeFilePath,
+                        envFilePath: deployConfig.envFilePath || undefined
+                      });
+                      showAlert('Success', 'Successfully deployed compose project.');
+                    } catch (error: any) {
+                      showAlert('Deploy Failed', error.message);
+                    }
+                    fetchContainers();
+                    setUpdatingAll(false);
+                  }}
+                >Deploy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {remoteBrowserOpen && (
         <RemoteFileBrowser 
           envId={envId}
+          allowedExtensions={browserTarget === 'compose' ? ['.yml', '.yaml'] : ['.env']}
           onClose={() => setRemoteBrowserOpen(false)}
-          onFileSelect={async (content, filePath) => {
+          onFileSelect={async (content: string, filePath?: string) => {
             setRemoteBrowserOpen(false);
-            setUpdatingAll(true);
-            setUpdateAllStatus('Pulling and deploying selected file...');
-            try {
-              await apiPost('/api/compose/deploy', { 
-                envId, 
-                yamlContent: content,
-                composeFilePath: filePath
-              });
-              showAlert('Success', 'Successfully deployed remote compose project.');
-            } catch (error: any) {
-              showAlert('Deploy Failed', error.message);
+            if (browserTarget === 'compose') {
+              setDeployConfig(prev => ({ ...prev, composeFilePath: filePath || '', composeFileContent: content }));
+            } else {
+              setDeployConfig(prev => ({ ...prev, envFilePath: filePath || '' }));
             }
-            fetchContainers();
-            setUpdatingAll(false);
           }}
         />
       )}

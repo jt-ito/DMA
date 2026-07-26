@@ -15,6 +15,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Environment not found' }, { status: 404 });
     }
     
+    if (env.type === 'local') {
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+      const os = await import('os');
+      const expandedPath = path.startsWith('~') ? path.replace(/^~/, os.homedir()) : path;
+      const actualPath = pathModule.resolve(expandedPath);
+      const content = await fs.readFile(actualPath, 'utf8');
+      return NextResponse.json({ content });
+    }
+
     // Replace leading ~ with $HOME
     const expandedPath = path.replace(/^~/, '$HOME');
     
@@ -27,6 +37,12 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 });
     }
+    
+    // Check if the error is ENOENT (file not found)
+    if (error.code === 'ENOENT') {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+
     console.error('Error reading fs:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

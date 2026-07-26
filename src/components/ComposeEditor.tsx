@@ -9,11 +9,29 @@ import styles from './ComposeEditor.module.css';
 interface Props {
   envId: string;
   onDeployStart?: () => void;
-  onDeployEnd?: () => void;
+  onDeployEnd?: (success: boolean) => void;
+}
+
+function truncatePath(path: string, maxLength: number = 35) {
+  if (!path || path === 'Auto-detected' || path.length <= maxLength) return path;
+  const separator = path.includes('\\') ? '\\' : '/';
+  const parts = path.split(separator);
+  if (parts.length <= 2) {
+    return path.substring(0, 15) + '...' + path.substring(path.length - 15);
+  }
+  const first = parts[0] + separator + parts[1];
+  const last = parts.slice(-2).join(separator); // show last dir and file
+  const combined = `${first}${separator}...${separator}${last}`;
+  if (combined.length > maxLength + 10) {
+     return path.substring(0, 10) + '...' + path.substring(path.length - 15);
+  }
+  return combined;
 }
 
 export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
   const [yamlContent, setYamlContent] = useState('');
+  const [envContent, setEnvContent] = useState('');
+  const [activeEditor, setActiveEditor] = useState<'compose' | 'env'>('compose');
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,11 +41,17 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
   const [backupPrompt, setBackupPrompt] = useState<{ content: string, filePath: string } | null>(null);
   const [backupPath, setBackupPath] = useState('');
   const [loadedFilePath, setLoadedFilePath] = useState<string | null>(null);
+  const [envFilePath, setEnvFilePath] = useState<string>('');
+  const [browserTarget, setBrowserTarget] = useState<'compose' | 'env'>('compose');
   const [pruneImages, setPruneImages] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelection = useRef<{ start: number; end: number } | null>(null);
   const lastSavedContentRef = useRef<string>('');
+  const lastSavedEnvContentRef = useRef<string>('');
+  const [autoDetectedEnvPath, setAutoDetectedEnvPath] = useState<string>('');
+
+  const effectiveEnvPath = envFilePath || autoDetectedEnvPath;
 
   useEffect(() => {
     if (pendingSelection.current && textareaRef.current) {
@@ -35,6 +59,62 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
       pendingSelection.current = null;
     }
   }, [yamlContent]);
+
+  useEffect(() => {
+    if (!loadedFilePath) {
+      setAutoDetectedEnvPath('');
+      return;
+    }
+
+    const detectEnvFile = async () => {
+      const isWindows = loadedFilePath.includes('\\');
+      const separator = isWindows ? '\\' : '/';
+      const lastSlashIndex = loadedFilePath.lastIndexOf(separator);
+      if (lastSlashIndex === -1) return;
+      
+      const dirPath = loadedFilePath.substring(0, lastSlashIndex);
+      const baseName = loadedFilePath.substring(lastSlashIndex + 1);
+      const nameWithoutExt = baseName.replace(/\.ya?ml$/i, '');
+
+      try {
+        const res = await fetch('/api/fs/list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ envId, path: dirPath })
+        });
+        const data = await res.json();
+        if (res.ok && data.items) {
+          const envFiles = data.items.filter((item: any) => !item.isDir && item.name.includes('.env'));
+          
+          let selectedEnvName = '';
+          if (envFiles.length === 1) {
+            selectedEnvName = envFiles[0].name;
+          } else if (envFiles.length > 1) {
+            const baseMatch = envFiles.find((item: any) => item.name === `${nameWithoutExt}.env`);
+            if (baseMatch) {
+              selectedEnvName = baseMatch.name;
+            } else {
+              const exactEnvMatch = envFiles.find((item: any) => item.name === '.env');
+              if (exactEnvMatch) {
+                selectedEnvName = exactEnvMatch.name;
+              }
+            }
+          }
+
+          if (selectedEnvName) {
+            setAutoDetectedEnvPath(`${dirPath}${separator}${selectedEnvName}`);
+          } else {
+            setAutoDetectedEnvPath(`${dirPath}${separator}.env`);
+          }
+        } else {
+          setAutoDetectedEnvPath(`${dirPath}${separator}.env`);
+        }
+      } catch (e) {
+        setAutoDetectedEnvPath(`${dirPath}${separator}.env`);
+      }
+    };
+    detectEnvFile();
+  }, [envId, loadedFilePath]);
 
   useEffect(() => {
     // Fetch the current environment to get its saved composeYaml
@@ -73,6 +153,21 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
             setYamlContent(envData.composeYaml);
             lastSavedContentRef.current = envData.composeYaml;
           }
+          if (envData.envFilePath) {
+            setEnvFilePath(envData.envFilePath);
+            try {
+              const envRes = await fetch('/api/fs/read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ envId, path: envData.envFilePath })
+              });
+              const envFileData = await envRes.json();
+              if (envRes.ok && envFileData.content !== undefined) {
+                setEnvContent(envFileData.content);
+                lastSavedEnvContentRef.current = envFileData.content;
+              }
+            } catch(e) {}
+          }
           if (envData.pruneImagesOnDeploy !== undefined) {
             setPruneImages(envData.pruneImagesOnDeploy);
           }
@@ -86,82 +181,77 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
   }, [envId]);
 
   useEffect(() => {
-    if (!loadedFilePath) return;
-
     // Polling for external changes
     const intervalId = setInterval(async () => {
-      try {
-        const res = await fetch('/api/fs/read', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ envId, path: loadedFilePath })
-        });
-        const data = await res.json();
-        if (res.ok && data.content !== undefined) {
-          if (data.content !== lastSavedContentRef.current) {
-            // File changed on disk! Update editor to match disk
+      if (loadedFilePath) {
+        try {
+          const res = await fetch('/api/fs/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ envId, path: loadedFilePath })
+          });
+          const data = await res.json();
+          if (res.ok && data.content !== undefined && data.content !== lastSavedContentRef.current) {
             lastSavedContentRef.current = data.content;
             setYamlContent(data.content);
           }
-        }
-      } catch (e) {
-        // ignore errors in polling
+        } catch (e) {}
+      }
+      
+      if (effectiveEnvPath) {
+        try {
+          const res = await fetch('/api/fs/read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ envId, path: effectiveEnvPath })
+          });
+          const data = await res.json();
+          if (res.ok && data.content !== undefined && data.content !== lastSavedEnvContentRef.current) {
+            lastSavedEnvContentRef.current = data.content;
+            setEnvContent(data.content);
+          }
+        } catch (e) {}
       }
     }, 2000); // 2 second polling
 
     return () => clearInterval(intervalId);
-  }, [envId, loadedFilePath]);
+  }, [envId, loadedFilePath, effectiveEnvPath]);
 
   useEffect(() => {
-    if (!loadedFilePath || yamlContent === lastSavedContentRef.current) return;
-
-    // Auto-save changes made in editor to disk
     const timeoutId = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/fs/write', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ envId, path: loadedFilePath, content: yamlContent })
-        });
-        if (res.ok) {
-          lastSavedContentRef.current = yamlContent;
-        }
-      } catch (e) {
-        // ignore errors in auto-save
+      if (loadedFilePath && yamlContent !== lastSavedContentRef.current) {
+        try {
+          const res = await fetch('/api/fs/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ envId, path: loadedFilePath, content: yamlContent })
+          });
+          if (res.ok) lastSavedContentRef.current = yamlContent;
+        } catch (e) {}
+      }
+      
+      if (effectiveEnvPath && envContent !== lastSavedEnvContentRef.current) {
+        try {
+          const res = await fetch('/api/fs/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ envId, path: effectiveEnvPath, content: envContent })
+          });
+          if (res.ok) lastSavedEnvContentRef.current = envContent;
+        } catch (e) {}
       }
     }, 800); // 800ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [yamlContent, envId, loadedFilePath]);
+  }, [yamlContent, envContent, envId, loadedFilePath, effectiveEnvPath]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setYamlContent(event.target.result as string);
-        setSuccess("File loaded successfully. Review and click Deploy.");
-        setError(null);
-      }
-    };
-    reader.onerror = () => {
-      setError("Failed to read file.");
-    };
-    reader.readAsText(file);
-    
-    // Reset input so the same file can be selected again
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
 
   const handleDeploy = async () => {
     setDeploying(true);
     if (onDeployStart) onDeployStart();
     setError(null);
     setSuccess(null);
+    let isSuccess = false;
     try {
       const res = await fetch('/api/compose/deploy', {
         method: 'POST',
@@ -170,6 +260,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
           envId, 
           yamlContent, 
           composeFilePath: loadedFilePath || undefined,
+          envFilePath: effectiveEnvPath || undefined,
           pruneImages 
         }),
       });
@@ -178,11 +269,12 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
         throw new Error(data.error || 'Deploy failed');
       }
       setSuccess("Successfully deployed docker-compose.yml!");
+      isSuccess = true;
     } catch (e: any) {
       setError(e.message);
     }
     setDeploying(false);
-    if (onDeployEnd) onDeployEnd();
+    if (onDeployEnd) onDeployEnd(isSuccess);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -190,6 +282,8 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
     const start = target.selectionStart;
     const end = target.selectionEnd;
     const value = target.value;
+    const isEnv = activeEditor === 'env';
+    const setContent = isEnv ? setEnvContent : setYamlContent;
 
     const getLineBounds = (s: number, e: number) => {
       const lineStart = value.lastIndexOf('\n', s - 1) + 1;
@@ -224,7 +318,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
       });
       
       const newValue = value.substring(0, lineStart) + newLines.join('\n') + value.substring(lineEnd);
-      setYamlContent(newValue);
+      setContent(newValue);
       
       const startLineDiff = newLines[0].length - lines[0].length;
       const totalDiff = newValue.length - value.length;
@@ -244,7 +338,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
       if (!isMultiLine && !e.shiftKey) {
         // Simple insert spaces at cursor
         const newValue = value.substring(0, start) + '  ' + value.substring(end);
-        setYamlContent(newValue);
+        setContent(newValue);
         pendingSelection.current = { start: start + 2, end: start + 2 };
       } else {
         // Multi-line indent/outdent
@@ -260,7 +354,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
         });
         
         const newValue = value.substring(0, lineStart) + newLines.join('\n') + value.substring(lineEnd);
-        setYamlContent(newValue);
+        setContent(newValue);
         
         const startDiff = newLines[0].length - lines[0].length;
         const totalDiff = newValue.length - value.length;
@@ -283,7 +377,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
         const prevLine = value.substring(prevLineStart, lineStart - 1);
         
         const newValue = value.substring(0, prevLineStart) + selectedLines + '\n' + prevLine + value.substring(lineEnd);
-        setYamlContent(newValue);
+        setContent(newValue);
         
         pendingSelection.current = {
           start: start - prevLine.length - 1,
@@ -295,7 +389,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
         const nextLine = value.substring(lineEnd + 1, actualNextLineEnd);
         
         const newValue = value.substring(0, lineStart) + nextLine + '\n' + selectedLines + value.substring(actualNextLineEnd);
-        setYamlContent(newValue);
+        setContent(newValue);
         
         pendingSelection.current = {
           start: start + nextLine.length + 1,
@@ -327,47 +421,63 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
       {success && <div className={styles.success}>{success}</div>}
 
       <div className={styles.controls}>
-        {env?.type === 'local' ? (
-          <>
-            <input 
-              type="file" 
-              accept=".yml,.yaml" 
-              ref={fileInputRef} 
-              style={{ display: 'none' }} 
-              onChange={handleFileChange}
-            />
-            <button 
-              className="glass-button" 
-              onClick={() => fileInputRef.current?.click()}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}
-            >
-              <Upload size={16} /> Load Local File
-            </button>
-          </>
-        ) : (
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
           <button 
             className="glass-button" 
-            onClick={() => setRemoteBrowserOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}
+            onClick={() => { setBrowserTarget('compose'); setRemoteBrowserOpen(true); }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            <HardDrive size={16} /> Browse Remote File
+            <HardDrive size={16} /> Select Compose File
           </button>
+          
+          {effectiveEnvPath && (
+              <button 
+                className="glass-button" 
+                onClick={() => setActiveEditor(activeEditor === 'compose' ? 'env' : 'compose')}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <HardDrive size={16} style={{ visibility: 'hidden', width: 0 }} /> {/* Spacer to match height/alignment if needed, or just remove */}
+                Switch to {activeEditor === 'compose' ? '.env' : 'Compose'}
+              </button>
+            )}
+        </div>
+        {loadedFilePath && (
+          <div className={styles.envFileContainer}>
+            <button className="glass-button" onClick={() => { setBrowserTarget('env'); setRemoteBrowserOpen(true); }}>Browse</button>
+            <span style={{ fontWeight: 500 }}>Env File:</span>
+            <input 
+              type="text" 
+              readOnly 
+              value={envFilePath ? truncatePath(envFilePath) : 'Auto-detected'} 
+              className={styles.input} 
+              style={{ flex: 'none', width: '300px' }}
+              title={envFilePath || 'Auto-detected'}
+            />
+          </div>
         )}
       </div>
 
       {remoteBrowserOpen && (
         <RemoteFileBrowser 
           envId={envId}
+          allowedExtensions={browserTarget === 'compose' ? ['.yml', '.yaml'] : ['.env']}
           onClose={() => setRemoteBrowserOpen(false)}
-          onFileSelect={(content, filePath) => {
-            if (filePath) {
-              setBackupPrompt({ content, filePath });
-              setBackupPath(`${filePath}.bak`);
-              setRemoteBrowserOpen(false);
+          onFileSelect={(content: string, filePath?: string) => {
+            if (browserTarget === 'compose') {
+              if (filePath) {
+                setBackupPrompt({ content, filePath });
+                setBackupPath(`${filePath}.bak`);
+                setRemoteBrowserOpen(false);
+              } else {
+                setYamlContent(content);
+                setSuccess("File loaded successfully. Review and click Deploy.");
+                setError(null);
+                setRemoteBrowserOpen(false);
+              }
             } else {
-              setYamlContent(content);
-              setSuccess("Remote file loaded successfully. Review and click Deploy.");
-              setError(null);
+              setEnvFilePath(filePath || '');
+              setEnvContent(content || '');
+              lastSavedEnvContentRef.current = content || '';
               setRemoteBrowserOpen(false);
             }
           }}
@@ -385,7 +495,8 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
               type="text" 
               value={backupPath}
               onChange={e => setBackupPath(e.target.value)}
-              style={{ width: '100%', marginBottom: '1.5rem', padding: '0.75rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)', borderRadius: '6px' }}
+              className={styles.input}
+              style={{ marginBottom: '1.5rem', width: '100%' }}
             />
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button 
@@ -433,10 +544,10 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
         <textarea
           ref={textareaRef}
           className={styles.textarea}
-          value={yamlContent}
-          onChange={(e) => setYamlContent(e.target.value)}
+          value={activeEditor === 'env' ? envContent : yamlContent}
+          onChange={(e) => activeEditor === 'env' ? setEnvContent(e.target.value) : setYamlContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="version: '3'&#10;services:&#10;  ..."
+          placeholder={activeEditor === 'env' ? "ENV_VAR=value\nANOTHER_VAR=123" : "version: '3'\nservices:\n  ..."}
           spellCheck={false}
         />
       </div>

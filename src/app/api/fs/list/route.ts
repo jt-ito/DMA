@@ -15,6 +15,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Environment not found' }, { status: 404 });
     }
     
+    if (env.type === 'local') {
+      const fs = await import('fs/promises');
+      const pathModule = await import('path');
+      const os = await import('os');
+      
+      const expandedPath = path.startsWith('~') ? path.replace(/^~/, os.homedir()) : path;
+      const actualPath = pathModule.resolve(expandedPath);
+      
+      const dirents = await fs.readdir(actualPath, { withFileTypes: true }).catch(() => []);
+      const items = dirents.map(dirent => {
+        return {
+          name: dirent.name,
+          isDir: dirent.isDirectory()
+        };
+      }).filter(item => item.name !== '.' && item.name !== '..');
+      
+      items.sort((a, b) => {
+        if (a.isDir && !b.isDir) return -1;
+        if (!a.isDir && b.isDir) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      
+      return NextResponse.json({ items, actualPath: actualPath.replace(/\\/g, '/') });
+    }
+    
     // Replace leading ~ with $HOME so bash evaluates it properly inside double quotes
     const expandedPath = path.replace(/^~/, '$HOME');
     

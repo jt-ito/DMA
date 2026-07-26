@@ -15,6 +15,7 @@ export interface Environment {
   privateKey?: string;
   composeYaml?: string;
   composeFilePath?: string;
+  envFilePath?: string;
   pruneImagesOnDeploy?: boolean;
   disabled?: boolean;
 }
@@ -27,10 +28,10 @@ function escapeShellArg(arg: string) {
 export async function executeCommand(env: Environment, command: string, args?: string[], cwd?: string): Promise<{ stdout: string; stderr: string }> {
   if (env.type === 'local') {
     if (args) {
-      return execFileAsync(command, args, { cwd });
+      return execFileAsync(command, args, { cwd, maxBuffer: 1024 * 1024 * 50 });
     } else {
       // Fallback for debug endpoint or complex bash pipes
-      return execAsync(command, { cwd });
+      return execAsync(command, { cwd, maxBuffer: 1024 * 1024 * 50 });
     }
   } else {
     const ssh = new NodeSSH();

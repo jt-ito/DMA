@@ -4,7 +4,7 @@ import { deployCompose } from '@/lib/docker';
 
 export async function POST(request: Request) {
   try {
-    const { envId, yamlContent, composeFilePath, pruneImages } = await request.json();
+    const { envId, yamlContent, composeFilePath, pruneImages, envFilePath } = await request.json();
 
     if (!envId || !yamlContent) {
       return NextResponse.json({ error: 'Missing envId or yamlContent' }, { status: 400 });
@@ -23,10 +23,13 @@ export async function POST(request: Request) {
     if (pruneImages !== undefined) {
       env.pruneImagesOnDeploy = pruneImages;
     }
+    if (envFilePath !== undefined) {
+      env.envFilePath = envFilePath;
+    }
     saveEnvironment(env);
 
     // Deploy the compose file
-    await deployCompose(env, yamlContent, env.composeFilePath, pruneImages);
+    await deployCompose(env, yamlContent, env.composeFilePath, pruneImages, env.envFilePath);
 
     return NextResponse.json({ success: true });
   } catch (e: any) {

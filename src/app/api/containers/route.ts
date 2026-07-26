@@ -4,6 +4,8 @@ import { getContainers, manageContainer } from '@/lib/docker';
 import { EnvIdSchema, ManageContainerSchema } from '@/lib/validations';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 declare global {
   var _dockerConnectionState: boolean | undefined;
 }
