@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "2.0.0"
+version = "2.0.2"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -27,3 +27,4 @@ regex = "1.13.1"
 open = "5.4.0"
 bcrypt = "0.15.1"
 rand = "0.8.5"
+tauri-plugin-window-state = "2.4.1"

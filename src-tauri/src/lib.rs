@@ -98,6 +98,122 @@ fn complete_setup(username: String, password: String, port: String) -> Result<()
 }
 
 #[tauri::command]
+fn get_settings() -> Result<(String, String), String> {
+    let mut config_dir = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+    
+    config_dir.push(".docker-manager");
+    let env_path = config_dir.join(".env");
+
+    let mut username = String::new();
+    let mut port = "3000".to_string();
+
+    if let Ok(contents) = std::fs::read_to_string(&env_path) {
+        for line in contents.lines() {
+            let line = line.trim();
+            if line.starts_with("ADMIN_USERNAME=") {
+                username = line.replace("ADMIN_USERNAME=", "").replace("\"", "").replace("'", "").trim().to_string();
+            } else if line.starts_with("PORT=") {
+                port = line.replace("PORT=", "").replace("\"", "").replace("'", "").trim().to_string();
+            }
+        }
+    }
+    
+    Ok((username, port))
+}
+
+#[tauri::command]
+fn update_settings(username: String, password: Option<String>, port: String) -> Result<(), String> {
+    let mut config_dir = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+    
+    config_dir.push(".docker-manager");
+    let env_path = config_dir.join(".env");
+
+    let mut old_hash = String::new();
+    let mut old_jwt = String::new();
+
+    if let Ok(contents) = std::fs::read_to_string(&env_path) {
+        for line in contents.lines() {
+            let line = line.trim();
+            if line.starts_with("ADMIN_PASSWORD_HASH=") {
+                old_hash = line.replace("ADMIN_PASSWORD_HASH=", "").replace("\"", "").replace("'", "").trim().to_string();
+            } else if line.starts_with("JWT_SECRET=") {
+                old_jwt = line.replace("JWT_SECRET=", "").replace("\"", "").replace("'", "").trim().to_string();
+            }
+        }
+    }
+
+    if old_jwt.is_empty() {
+        return Err("Configuration missing JWT_SECRET".to_string());
+    }
+
+    let final_hash = if let Some(new_pass) = password {
+        if new_pass.is_empty() {
+            old_hash
+        } else if new_pass.len() < 4 {
+            return Err("Password must be at least 4 characters".to_string());
+        } else {
+            hash(new_pass, DEFAULT_COST).map_err(|e| e.to_string())?
+        }
+    } else {
+        old_hash
+    };
+
+    let env_content = format!(
+        "ADMIN_USERNAME=\"{}\"\nADMIN_PASSWORD_HASH=\"{}\"\nJWT_SECRET=\"{}\"\nPORT=\"{}\"\n",
+        username, final_hash, old_jwt, port
+    );
+
+    std::fs::write(env_path, env_content).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn kill_port_process(port: &str) {
+    if let Ok(output) = std::process::Command::new("netstat")
+        .args(["-ano"])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let search_str = format!(":{}", port);
+        for line in stdout.lines() {
+            if line.contains(&search_str) && line.contains("LISTENING") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(pid) = parts.last() {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", pid])
+                        .status();
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_port_process(port: &str) {
+    if let Ok(output) = std::process::Command::new("lsof")
+        .args(["-t", "-i", &format!(":{}", port)])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for pid in stdout.lines() {
+            let pid = pid.trim();
+            if !pid.is_empty() {
+                let _ = std::process::Command::new("kill")
+                    .args(["-9", pid])
+                    .status();
+            }
+        }
+    }
+}
+
+#[tauri::command]
 fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<(), String> {
     // Check if already running
     if let Ok(child_opt) = state.child.lock() {
@@ -107,6 +223,7 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
     }
 
     let port = get_configured_port();
+    kill_port_process(&port);
     
     let mut cmd = if cfg!(debug_assertions) {
         // Dev Mode
@@ -199,7 +316,12 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
                     for line in reader.lines() {
                         if let Ok(line) = line {
                             eprintln!("[Next.js Error] {}", line);
-                            let _ = app_handle_clone.emit("server-log", format!("ERROR: {}", line));
+                            let emit_line = if line.starts_with("ERROR: ") || line.starts_with("WARNING: ") {
+                                line.clone()
+                            } else {
+                                format!("ERROR: {}", line)
+                            };
+                            let _ = app_handle_clone.emit("server-log", emit_line);
                         }
                     }
                 });
@@ -219,7 +341,17 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
 fn stop_server(state: tauri::State<AppState>) -> Result<(), String> {
     if let Ok(mut child_opt) = state.child.lock() {
         if let Some(child) = child_opt.as_mut() {
-            let _ = child.kill();
+            #[cfg(target_os = "windows")]
+            {
+                let pid = child.id();
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .status();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = child.kill();
+            }
         }
         *child_opt = None;
     }
@@ -236,7 +368,17 @@ fn minimize_window(window: tauri::Window) -> Result<(), String> {
 fn close_app(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<(), String> {
     if let Ok(mut child_opt) = state.child.lock() {
         if let Some(child) = child_opt.as_mut() {
-            let _ = child.kill();
+            #[cfg(target_os = "windows")]
+            {
+                let pid = child.id();
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .status();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = child.kill();
+            }
         }
     }
     app.exit(0);
@@ -253,9 +395,12 @@ fn open_browser() -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .plugin(tauri_plugin_window_state::Builder::default().build())
     .invoke_handler(tauri::generate_handler![
         is_configured,
         complete_setup,
+        get_settings,
+        update_settings,
         start_server,
         stop_server,
         minimize_window,
@@ -303,7 +448,17 @@ pub fn run() {
               "quit" => {
                   if let Ok(mut child_opt) = child_mutex_for_tray.lock() {
                       if let Some(child) = child_opt.as_mut() {
-                          let _ = child.kill();
+                          #[cfg(target_os = "windows")]
+                          {
+                              let pid = child.id();
+                              let _ = std::process::Command::new("taskkill")
+                                  .args(["/F", "/T", "/PID", &pid.to_string()])
+                                  .status();
+                          }
+                          #[cfg(not(target_os = "windows"))]
+                          {
+                              let _ = child.kill();
+                          }
                       }
                   }
                   app.exit(0);

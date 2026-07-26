@@ -129,6 +129,16 @@
             transform: translateY(-1px);
         }
 
+        .btn-success {
+            background-color: #22c55e;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #16a34a;
+            transform: translateY(-1px);
+        }
+
         .btn-outline {
             background-color: transparent;
             border: 1px solid var(--card-border);
@@ -190,6 +200,7 @@
             font-size: 13px;
             color: var(--console-text);
             overflow-y: auto;
+            scroll-behavior: smooth;
             white-space: pre-wrap;
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
             user-select: text; /* Allow text selection in the console */
@@ -201,6 +212,58 @@
 
         .log-line.error {
             color: #ef4444;
+        }
+
+        .log-line.warning {
+            color: #eab308;
+        }
+
+        .log-line.success {
+            color: #22c55e;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--card-border);
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-color);
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .slider {
+            background-color: #22c55e;
+        }
+
+        .toggle-switch input:checked + .slider:before {
+            transform: translateX(20px);
+            background-color: white;
         }
 
         /* Modal */
@@ -361,6 +424,9 @@
                 <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
                 <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
             </button>
+            <button class="theme-toggle" id="settingsBtn" aria-label="Settings" style="display: none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
             <button class="btn-primary" id="openBrowserBtn" style="display: none;">Open Web UI</button>
             <button class="btn-danger" id="stopServerBtn" style="display: none;">Stop Server</button>
         </div>
@@ -418,10 +484,53 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h2>Settings</h2>
+            <p>Change your backend credentials and port.</p>
+            <div class="error-message" id="settingsError" style="margin-bottom: 16px;"></div>
+            
+            <div class="form-group" style="text-align: left; margin-bottom: 12px;">
+                <label for="settingsUsername">Username</label>
+                <input type="text" id="settingsUsername" required>
+            </div>
+            
+            <div class="form-group" style="text-align: left; margin-bottom: 12px;">
+                <label for="settingsPassword">New Password (Optional)</label>
+                <input type="password" id="settingsPassword" placeholder="Leave blank to keep current">
+            </div>
+            
+            <div class="form-group" style="text-align: left; margin-bottom: 12px;">
+                <label for="settingsConfirmPassword">Confirm New Password</label>
+                <input type="password" id="settingsConfirmPassword">
+            </div>
+
+            <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+                <label for="settingsPort">Server Port</label>
+                <input type="number" id="settingsPort" min="1" max="65535" required>
+            </div>
+
+            <div class="form-group" style="text-align: left; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+                <label for="settingsDebugLogs" style="margin-bottom: 0; cursor: pointer;">Enable Debug Logs</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="settingsDebugLogs">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-primary" id="saveSettingsBtn">Save & Restart Server</button>
+                <button class="btn-outline" id="cancelSettingsBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Use Global Tauri API injected by withGlobalTauri
         const { invoke } = window.__TAURI__.core;
         const { listen } = window.__TAURI__.event;
+        
+        let enableDebugLogs = localStorage.getItem('debugLogs') === 'true';
 
         // Theme Toggle
         const html = document.documentElement;
@@ -447,11 +556,25 @@
             invoke('open_browser');
         });
 
-        document.getElementById('stopServerBtn').addEventListener('click', () => {
-            invoke('stop_server');
-            appendLog('Server stopped by user. You can now safely close the app.');
-            document.querySelector('.status-dot').style.backgroundColor = '#ef4444';
-            document.querySelector('.status-dot').style.animation = 'none';
+        const serverBtn = document.getElementById('stopServerBtn');
+        serverBtn.addEventListener('click', async () => {
+            if (serverBtn.classList.contains('btn-danger')) {
+                await invoke('stop_server');
+                appendLog('Server stopped by user. You can now safely close the app.');
+                document.querySelector('.status-dot').style.backgroundColor = '#ef4444';
+                document.querySelector('.status-dot').style.animation = 'none';
+                
+                serverBtn.textContent = 'Start Server';
+                serverBtn.classList.replace('btn-danger', 'btn-success');
+            } else {
+                await invoke('start_server');
+                appendLog('Server started by user.');
+                document.querySelector('.status-dot').style.backgroundColor = '#22c55e';
+                document.querySelector('.status-dot').style.animation = 'pulse 2s infinite';
+                
+                serverBtn.textContent = 'Stop Server';
+                serverBtn.classList.replace('btn-success', 'btn-danger');
+            }
         });
 
         // Console
@@ -461,13 +584,20 @@
             const div = document.createElement('div');
             div.className = 'log-line';
             if (line.includes('ERROR:')) div.classList.add('error');
+            else if (line.includes('WARNING:')) div.classList.add('warning');
+            else if (line.includes('SUCCESS:')) div.classList.add('success');
             div.textContent = line;
             consoleOutput.appendChild(div);
             consoleOutput.scrollTop = consoleOutput.scrollHeight;
         }
 
         // Listen for server logs from Rust
+        function isDebugLog(line) {
+            return /^\s*(GET|POST|PUT|DELETE|PATCH)\s+\//.test(line) || line.includes('application-code)') || line.includes('next.js:');
+        }
+
         listen('server-log', (event) => {
+            if (!enableDebugLogs && isDebugLog(event.payload)) return;
             appendLog(event.payload);
         });
 
@@ -492,6 +622,82 @@
             invoke('close_app');
         });
 
+        // Settings Modal Logic
+        const settingsModal = document.getElementById('settingsModal');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
+        const settingsError = document.getElementById('settingsError');
+
+        settingsBtn.addEventListener('click', async () => {
+            try {
+                const [username, port] = await invoke('get_settings');
+                document.getElementById('settingsUsername').value = username;
+                document.getElementById('settingsPort').value = port;
+                document.getElementById('settingsPassword').value = '';
+                document.getElementById('settingsConfirmPassword').value = '';
+                document.getElementById('settingsDebugLogs').checked = enableDebugLogs;
+                settingsError.style.display = 'none';
+                settingsModal.classList.add('active');
+            } catch (e) {
+                appendLog('Error loading settings: ' + e);
+            }
+        });
+
+        cancelSettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.remove('active');
+        });
+
+        saveSettingsBtn.addEventListener('click', async () => {
+            const username = document.getElementById('settingsUsername').value;
+            const password = document.getElementById('settingsPassword').value;
+            const confirmPassword = document.getElementById('settingsConfirmPassword').value;
+            const port = document.getElementById('settingsPort').value;
+            
+            enableDebugLogs = document.getElementById('settingsDebugLogs').checked;
+            localStorage.setItem('debugLogs', enableDebugLogs);
+
+            if (password !== confirmPassword) {
+                settingsError.textContent = 'Passwords do not match';
+                settingsError.style.display = 'block';
+                return;
+            }
+
+            try {
+                saveSettingsBtn.textContent = 'Saving...';
+                saveSettingsBtn.disabled = true;
+
+                await invoke('update_settings', { 
+                    username, 
+                    password: password ? password : null, 
+                    port 
+                });
+                
+                settingsModal.classList.remove('active');
+                appendLog('Settings saved. Restarting server...');
+                
+                // Restart server
+                await invoke('stop_server');
+                await new Promise(r => setTimeout(r, 1000));
+                await invoke('start_server');
+                
+                // Ensure button is back to "Stop Server" state
+                if (serverBtn.classList.contains('btn-success')) {
+                    serverBtn.textContent = 'Stop Server';
+                    serverBtn.classList.replace('btn-success', 'btn-danger');
+                    document.querySelector('.status-dot').style.backgroundColor = '#22c55e';
+                    document.querySelector('.status-dot').style.animation = 'pulse 2s infinite';
+                }
+                
+            } catch (e) {
+                settingsError.textContent = e;
+                settingsError.style.display = 'block';
+            } finally {
+                saveSettingsBtn.textContent = 'Save & Restart Server';
+                saveSettingsBtn.disabled = false;
+            }
+        });
+
         // App Boot Logic
         async function bootApp() {
             try {
@@ -509,9 +715,11 @@
         }
 
         function showConsole() {
+            document.querySelector('main').style.overflow = 'hidden';
             document.getElementById('setupWizard').classList.remove('active');
             document.getElementById('consoleContainer').style.display = 'flex';
             document.getElementById('headerStatus').textContent = 'Background Server Running';
+            document.getElementById('settingsBtn').style.display = 'flex';
             document.getElementById('openBrowserBtn').style.display = 'block';
             document.getElementById('stopServerBtn').style.display = 'block';
         }

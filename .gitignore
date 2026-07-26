@@ -47,3 +47,5 @@ dockermanager.exe
 
 # Demo
 docker-manager-demo/
+# Data folder
+/data/

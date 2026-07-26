@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { Environment } from './executor';
 
-const dataDir = path.join(process.cwd(), 'data');
+const dataDir = path.join(os.homedir(), '.docker-manager');
 const dataFile = path.join(dataDir, 'environments.json');
 
 export function getEnvironments(): Environment[] {

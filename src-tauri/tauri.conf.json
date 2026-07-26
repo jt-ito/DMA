@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "docker-manager",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "identifier": "com.dockermanager.app",
   "build": {
     "frontendDist": "../tauri-ui",
@@ -13,10 +13,10 @@
       {
         "title": "Docker Manager",
         "width": 800,
-        "height": 600,
+        "height": 750,
         "resizable": true,
         "fullscreen": false,
-        "visible": true
+        "visible": false
       }
     ],
     "security": {
