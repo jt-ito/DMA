@@ -21,7 +21,8 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 - **🌐 Network & IP Management**: Quickly view active ports and **open them directly in new browser tabs**. The app also securely fetches and displays the remote server's **Public IP address** on the fly (never permanently stored).
 - **🛑 Advanced Container Management**: 
   - Stop, restart, or completely delete individual containers.
-  - **Pull new images** for individual items to seamlessly update your services.
+  - **Live Stat Monitoring**: View real-time CPU and memory usage statistics for running containers.
+  - **Pull new images** for individual items to seamlessly update your services, complete with **new version notifications** indicating when an update is available.
 - **🛠️ Compose Project Control**: Take control of entire application stacks! **Bring down or spin up an entire project** (all containers) simultaneously with a single click.
 - **📝 Live Compose Editor**: A built-in code editor to view and modify your `docker-compose.yml` files. Make your changes, save, and immediately restart the compose stack right from the editor!
 - **📜 Log Viewer**: Instantly view, stream, and **copy container logs** for rapid debugging without ever touching the terminal.
