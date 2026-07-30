@@ -12,11 +12,13 @@ interface FsItem {
 interface Props {
   envId: string;
   onClose: () => void;
-  onFileSelect: (content: string, filePath?: string) => void;
+  onFileSelect?: (content: string, filePath?: string) => void;
+  onDirSelect?: (path: string) => void;
   allowedExtensions?: string[];
+  mode?: 'file' | 'directory';
 }
 
-export function RemoteFileBrowser({ envId, onClose, onFileSelect, allowedExtensions = ['.yml', '.yaml'] }: Props) {
+export function RemoteFileBrowser({ envId, onClose, onFileSelect, onDirSelect, allowedExtensions = ['.yml', '.yaml'], mode = 'file' }: Props) {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(`lastRemotePath-${envId}`) || '~';
@@ -82,7 +84,7 @@ export function RemoteFileBrowser({ envId, onClose, onFileSelect, allowedExtensi
         if (!res.ok) throw new Error(data.error || 'Failed to read file');
         
         localStorage.setItem(`lastRemotePath-${envId}`, currentPath);
-        onFileSelect(data.content, filePath);
+        if (onFileSelect) onFileSelect(data.content, filePath);
       } catch (e: any) {
         setError(e.message);
         setLoading(false);
@@ -103,7 +105,7 @@ export function RemoteFileBrowser({ envId, onClose, onFileSelect, allowedExtensi
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h3><HardDrive size={20} /> Select Compose File</h3>
+          <h3><HardDrive size={20} /> {mode === 'file' ? 'Select Compose File' : 'Select Directory'}</h3>
           <button className={styles.closeBtn} onClick={onClose}>
             <X size={20} />
           </button>
@@ -119,6 +121,17 @@ export function RemoteFileBrowser({ envId, onClose, onFileSelect, allowedExtensi
             <ChevronUp size={16} />
           </button>
           <span>{currentPath}</span>
+          {mode === 'directory' && (
+             <button 
+                className="glass-button" 
+                style={{ marginLeft: 'auto', padding: '0.2rem 0.8rem', fontSize: '0.9rem' }}
+                onClick={() => {
+                   if (onDirSelect) onDirSelect(currentPath);
+                }}
+             >
+                Select this directory
+             </button>
+          )}
         </div>
 
         {error && <div className={styles.error}>{error}</div>}

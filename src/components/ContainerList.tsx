@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown, Copy } from 'lucide-react';
+import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown, Copy, Activity, Settings, AlertCircle } from 'lucide-react';
 import { DockerContainer } from '@/lib/docker';
 import { CustomModal } from './CustomModal';
 import { RemoteFileBrowser } from './RemoteFileBrowser';
@@ -54,9 +54,49 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   const [updatingAll, setUpdatingAll] = useState(false);
   const [updateAllStatus, setUpdateAllStatus] = useState<string>('');
   const logsContainerRef = useRef<HTMLPreElement>(null);
+
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
+  const [currentStats, setCurrentStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const [policyModalOpen, setPolicyModalOpen] = useState(false);
+  const [selectedPolicy, setSelectedPolicy] = useState<string>('unless-stopped');
+
+  const [imageUpdates, setImageUpdates] = useState<Record<string, boolean>>({});
   
   const [remoteBrowserOpen, setRemoteBrowserOpen] = useState(false);
   const [browserTarget, setBrowserTarget] = useState<'compose' | 'env'>('compose');
+
+  type SortColumn = 'name' | 'state' | 'image' | 'composeProject';
+  type SortDirection = 'asc' | 'desc';
+  
+  const [sortColumn, setSortColumn] = useState<SortColumn>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('containerSortColumn') as SortColumn) || 'composeProject';
+    }
+    return 'composeProject';
+  });
+  
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('containerSortDirection') as SortDirection) || 'asc';
+    }
+    return 'asc';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('containerSortColumn', sortColumn);
+    localStorage.setItem('containerSortDirection', sortDirection);
+  }, [sortColumn, sortDirection]);
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
   
   const [deployConfigOpen, setDeployConfigOpen] = useState(false);
   const [deployConfig, setDeployConfig] = useState({
@@ -174,6 +214,9 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
             });
             
             globalCache[envId] = { data: nextContainers };
+            
+            // Background update checking moved to a separate useEffect
+            
             return nextContainers;
           });
           setError(null);
@@ -195,10 +238,26 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     // Refresh periodically to update uptimes
     const intervalId = setInterval(() => {
       fetchContainers(false);
-    }, 10000); // 10 seconds
-
+    }, 5000);
     return () => clearInterval(intervalId);
   }, [fetchContainers]);
+
+  const checkedImagesRef = useRef<Set<string>>(new Set());
+  
+  useEffect(() => {
+    containers.forEach(c => {
+       if (c.Image && !checkedImagesRef.current.has(c.Image)) {
+          checkedImagesRef.current.add(c.Image);
+          fetch(`/api/images/check-update?envId=${envId}&image=${encodeURIComponent(c.Image)}`)
+            .then(r => r.json())
+            .then(res => {
+               if (res.updateAvailable) {
+                  setImageUpdates(prev => ({ ...prev, [c.Image]: true }));
+               }
+            }).catch(() => {});
+       }
+    });
+  }, [containers, envId]);
 
   // When deployment finishes, automatically refresh the list
   useEffect(() => {
@@ -406,6 +465,46 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     setUpdatingAll(false);
   };
 
+  const handleViewStats = async (container: DockerContainer) => {
+    setSelectedContainerName(container.Names);
+    setSelectedContainerId(container.ID);
+    setCurrentStats(null);
+    setStatsLoading(true);
+    setStatsModalOpen(true);
+    try {
+      const res = await fetch(`/api/containers/stats?envId=${envId}&containerId=${container.ID}`);
+      const data = await res.json();
+      if (res.ok) setCurrentStats(data);
+    } catch (e) {}
+    setStatsLoading(false);
+  };
+
+  const handleUpdatePolicy = async () => {
+     if (!selectedContainerId) return;
+     setPolicyModalOpen(false);
+     try {
+       await apiPost('/api/containers/policy', { envId, containerId: selectedContainerId, policy: selectedPolicy });
+       fetchContainers();
+       showAlert('Success', 'Restart policy updated successfully.');
+     } catch (e: any) {
+       showAlert('Error', e.message);
+     }
+  };
+
+  useEffect(() => {
+    if (!statsModalOpen || !selectedContainerId) return;
+    let isActive = true;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/containers/stats?envId=${envId}&containerId=${selectedContainerId}`);
+        const data = await res.json();
+        if (isActive && res.ok) setCurrentStats(data);
+      } catch (e) {}
+    };
+    const intervalId = setInterval(poll, 2000);
+    return () => { isActive = false; clearInterval(intervalId); };
+  }, [statsModalOpen, selectedContainerId, envId]);
+
   const handleViewLogs = async (container: DockerContainer) => {
     setSelectedContainerName(container.Names);
     setSelectedContainerId(container.ID);
@@ -451,6 +550,34 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   }, [logsModalOpen, selectedContainerId, envId]);
 
   if (loading && containers.length === 0) return <div className={styles.loading}>Loading containers...</div>;
+
+  const sortedContainers = [...containers].sort((a, b) => {
+    let valA = '';
+    let valB = '';
+    
+    switch (sortColumn) {
+      case 'name':
+        valA = a.Names;
+        valB = b.Names;
+        break;
+      case 'state':
+        valA = granularStates[a.Names] || a.State;
+        valB = granularStates[b.Names] || b.State;
+        break;
+      case 'image':
+        valA = a.Image;
+        valB = b.Image;
+        break;
+      case 'composeProject':
+        valA = a.Project || '';
+        valB = b.Project || '';
+        break;
+    }
+    
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   if (error) return (
     <div className={`glass-panel ${styles.panel}`}>
@@ -502,15 +629,31 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>State</th>
-              <th>Image</th>
-              <th>Compose Project</th>
+              <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Name {sortColumn === 'name' && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                </div>
+              </th>
+              <th onClick={() => handleSort('state')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  State {sortColumn === 'state' && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                </div>
+              </th>
+              <th onClick={() => handleSort('image')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Image {sortColumn === 'image' && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                </div>
+              </th>
+              <th onClick={() => handleSort('composeProject')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  Compose Project {sortColumn === 'composeProject' && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                </div>
+              </th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {containers.map(c => {
+            {sortedContainers.map(c => {
               const granularState = granularStates[c.Names];
               const displayState = granularState || c.State;
               const isRunning = displayState === 'running';
@@ -610,6 +753,17 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                       <button title="View Logs" className={styles.actionBtn} onClick={() => handleViewLogs(c)} disabled={isLoading}>
                         <FileText size={16} />
                       </button>
+                      <button title="View Stats" className={styles.actionBtn} onClick={() => handleViewStats(c)} disabled={isLoading}>
+                        <Activity size={16} />
+                      </button>
+                      <button title="Change Restart Policy" className={styles.actionBtn} onClick={() => {
+                         setSelectedContainerId(c.ID);
+                         setSelectedContainerName(c.Names);
+                         setSelectedPolicy(c.RestartPolicy || 'unless-stopped');
+                         setPolicyModalOpen(true);
+                      }} disabled={isLoading}>
+                        <Settings size={16} />
+                      </button>
                       
 
                       {isCompose && (
@@ -620,7 +774,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                             onClick={() => handleUpdateCompose(c)} 
                             disabled={isLoading}
                           >
-                            <RefreshCw size={16} /> Update
+                            <RefreshCw size={16} /> {imageUpdates[c.Image] && <span style={{ color: 'var(--accent-color)' }}><AlertCircle size={14} style={{ marginRight: 4 }} /></span>} Update
                           </button>
                           <button 
                             title="Down Compose Service" 
@@ -673,6 +827,82 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
               ) : (
                 <pre className={styles.logsPre} ref={logsContainerRef}>{currentLogs || 'No logs available.'}</pre>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {statsModalOpen && (
+        <div className={styles.modalOverlay} onClick={() => setStatsModalOpen(false)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className={styles.modalHeader}>
+              <h3>Stats: {selectedContainerName}</h3>
+              <button className={styles.closeBtn} onClick={() => setStatsModalOpen(false)}><X size={20} /></button>
+            </div>
+            <div className={styles.modalBody}>
+              {statsLoading && !currentStats ? (
+                <div className={styles.loading}>Fetching stats...</div>
+              ) : currentStats ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="glass-panel" style={{ padding: '1rem', background: 'var(--bg-secondary)' }}>
+                    <h4>CPU Usage</h4>
+                    <p style={{ fontSize: '1.5rem', marginTop: '0.5rem', color: 'var(--accent-color)' }}>{currentStats.CPUPerc}</p>
+                  </div>
+                  <div className="glass-panel" style={{ padding: '1rem', background: 'var(--bg-secondary)' }}>
+                    <h4>Memory Usage</h4>
+                    <p style={{ fontSize: '1.5rem', marginTop: '0.5rem', color: 'var(--accent-color)' }}>{currentStats.MemUsage} ({currentStats.MemPerc})</p>
+                  </div>
+                  <div className="glass-panel" style={{ padding: '1rem', background: 'var(--bg-secondary)' }}>
+                    <h4>Network I/O</h4>
+                    <p style={{ fontSize: '1.5rem', marginTop: '0.5rem', color: 'var(--accent-color)' }}>{currentStats.NetIO}</p>
+                  </div>
+                  <div className="glass-panel" style={{ padding: '1rem', background: 'var(--bg-secondary)' }}>
+                    <h4>Block I/O</h4>
+                    <p style={{ fontSize: '1.5rem', marginTop: '0.5rem', color: 'var(--accent-color)' }}>{currentStats.BlockIO}</p>
+                  </div>
+                </div>
+              ) : (
+                <p>No stats available.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {policyModalOpen && (
+        <div className={styles.modalOverlay} onClick={() => setPolicyModalOpen(false)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className={styles.modalHeader}>
+              <h3>Restart Policy</h3>
+              <button className={styles.closeBtn} onClick={() => setPolicyModalOpen(false)}><X size={20} /></button>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ marginBottom: '1rem' }}>Set the restart policy for <strong>{selectedContainerName}</strong>:</p>
+              <select 
+                className={styles.input} 
+                value={selectedPolicy} 
+                onChange={(e) => setSelectedPolicy(e.target.value)}
+                style={{ 
+                  width: '100%', 
+                  marginBottom: '1.5rem', 
+                  backgroundColor: 'transparent', 
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-glass)',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="no" style={{ background: '#171717' }}>No</option>
+                <option value="always" style={{ background: '#171717' }}>Always</option>
+                <option value="unless-stopped" style={{ background: '#171717' }}>Unless Stopped</option>
+                <option value="on-failure" style={{ background: '#171717' }}>On Failure</option>
+              </select>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button className="glass-button" onClick={() => setPolicyModalOpen(false)}>Cancel</button>
+                <button className={`glass-button ${styles.primary}`} onClick={handleUpdatePolicy}>Save Policy</button>
+              </div>
             </div>
           </div>
         </div>

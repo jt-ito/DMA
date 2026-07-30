@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, HelpCircle, Globe, Copy } from 'lucide-react';
 import styles from './CustomModal.module.css';
 
-export interface CustomModalProps {
+interface CustomModalProps {
   isOpen: boolean;
   type: 'alert' | 'confirm' | 'info';
   title: string;

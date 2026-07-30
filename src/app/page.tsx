@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { ContainerList } from '@/components/ContainerList';
 import { ComposeEditor } from '@/components/ComposeEditor';
+import { TemplateLibrary } from '@/components/TemplateLibrary';
 import { CustomModal } from '@/components/CustomModal';
 import { Environment } from '@/lib/executor';
 import styles from './page.module.css';
 
 export default function Home() {
   const [selectedEnv, setSelectedEnv] = useState<Environment | null>(null);
-  const [activeTab, setActiveTab] = useState<'containers' | 'compose'>('containers');
+  const [activeTab, setActiveTab] = useState<'containers' | 'compose' | 'templates'>('containers');
   const [isDeploying, setIsDeploying] = useState(false);
   
   // Public IP state
@@ -48,25 +49,6 @@ export default function Home() {
     setSelectedEnv(env);
   };
 
-  const handlePullPublicIp = async () => {
-    if (!selectedEnv) return;
-    setIsPullingIp(true);
-    try {
-      const res = await fetch('/api/debug', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Assuming proxy handles the debug auth seamlessly, or we can use a dedicated endpoint
-          // But wait, /api/debug requires CSRF and step-up auth.
-          // Let's create an endpoint specifically for this or just allow the user to save it manually.
-        }
-      });
-      // Wait, let's just make a new simple endpoint /api/environments/ip
-    } catch (e) {
-      console.error(e);
-    }
-    setIsPullingIp(false);
-  };
 
   return (
     <div className={styles.container}>
@@ -127,6 +109,12 @@ export default function Home() {
                   >
                     Compose Editor
                   </button>
+                  <button 
+                    className={`${styles.tabBtn} ${activeTab === 'templates' ? styles.activeTab : ''}`}
+                    onClick={() => setActiveTab('templates')}
+                  >
+                    App Store
+                  </button>
                 </div>
                 
                 <div className={styles.content}>
@@ -145,6 +133,22 @@ export default function Home() {
                         setIsDeploying(false);
                         if (!success) {
                           setActiveTab('compose');
+                        }
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: activeTab === 'templates' ? 'block' : 'none', flex: 1, height: '100%' }}>
+                    <TemplateLibrary 
+                      key={`templates-${selectedEnv.id}`} 
+                      envId={selectedEnv.id} 
+                      onDeployStart={() => {
+                        setIsDeploying(true);
+                        setActiveTab('containers');
+                      }}
+                      onDeployEnd={(success) => {
+                        setIsDeploying(false);
+                        if (!success) {
+                          setActiveTab('templates');
                         }
                       }}
                     />

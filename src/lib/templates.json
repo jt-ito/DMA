@@ -1,0 +1,66 @@
+[
+  {
+    "id": "uptime-kuma",
+    "name": "Uptime Kuma",
+    "description": "A fancy self-hosted monitoring tool that you can use to monitor websites, APIs, and Docker containers.",
+    "iconUrl": "/icons/uptime-kuma.png",
+    "defaultCompose": "services:\n  uptime-kuma:\n    image: louislam/uptime-kuma:1\n    container_name: uptime-kuma\n    volumes:\n      - ./uptime-kuma-data:/app/data\n    ports:\n      - 3001:3001\n    restart: always\n",
+    "defaultEnv": ""
+  },
+  {
+    "id": "nginx-proxy-manager",
+    "name": "Nginx Proxy Manager",
+    "description": "Expose your services easily and securely with a web UI for managing Nginx reverse proxies and Let's Encrypt certificates.",
+    "iconUrl": "/icons/nginx-proxy-manager.png",
+    "defaultCompose": "services:\n  app:\n    image: 'jc21/nginx-proxy-manager:latest'\n    restart: unless-stopped\n    ports:\n      - '80:80'\n      - '81:81'\n      - '443:443'\n    volumes:\n      - ./data:/data\n      - ./letsencrypt:/etc/letsencrypt\n",
+    "defaultEnv": ""
+  },
+  {
+    "id": "pihole",
+    "name": "Pi-hole",
+    "description": "A DNS sinkhole that protects your devices from unwanted content, without installing any client-side software.",
+    "iconUrl": "/icons/pi-hole.png",
+    "defaultCompose": "services:\n  pihole:\n    container_name: pihole\n    image: pihole/pihole:latest\n    ports:\n      - \"53:53/tcp\"\n      - \"53:53/udp\"\n      - \"8080:80/tcp\"\n    environment:\n      TZ: \"America/Chicago\"\n      WEBPASSWORD: \"${WEBPASSWORD}\"\n    volumes:\n      - './etc-pihole:/etc/pihole'\n      - './etc-dnsmasq.d:/etc/dnsmasq.d'\n    restart: unless-stopped\n",
+    "defaultEnv": "WEBPASSWORD=changeme\n"
+  },
+  {
+    "id": "vaultwarden",
+    "name": "Vaultwarden",
+    "description": "Alternative implementation of the Bitwarden server API written in Rust, perfect for self-hosted deployments.",
+    "iconUrl": "/icons/vaultwarden.png",
+    "defaultCompose": "services:\n  vaultwarden:\n    image: vaultwarden/server:latest\n    container_name: vaultwarden\n    restart: always\n    environment:\n      WEBSOCKET_ENABLED: \"true\"\n    volumes:\n      - ./vw-data:/data\n    ports:\n      - 8081:80\n",
+    "defaultEnv": ""
+  },
+  {
+    "id": "nextcloud",
+    "name": "Nextcloud",
+    "description": "A safe home for all your data. A self-hosted productivity platform that keeps you in control.",
+    "iconUrl": "/icons/nextcloud.png",
+    "defaultCompose": "services:\n  db:\n    image: mariadb:10.6\n    restart: always\n    command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW\n    volumes:\n      - ./db:/var/lib/mysql\n    environment:\n      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}\n      - MYSQL_PASSWORD=${MYSQL_PASSWORD}\n      - MYSQL_DATABASE=nextcloud\n      - MYSQL_USER=nextcloud\n\n  app:\n    image: nextcloud\n    restart: always\n    ports:\n      - 8082:80\n    links:\n      - db\n    volumes:\n      - ./nextcloud:/var/www/html\n    environment:\n      - MYSQL_PASSWORD=${MYSQL_PASSWORD}\n      - MYSQL_DATABASE=nextcloud\n      - MYSQL_USER=nextcloud\n      - MYSQL_HOST=db\n",
+    "defaultEnv": "MYSQL_ROOT_PASSWORD=strongrootpassword\nMYSQL_PASSWORD=strongpassword\n"
+  },
+  {
+    "id": "filebrowser",
+    "name": "File Browser",
+    "description": "Web File Browser which can be used as a middleware or standalone app.",
+    "iconUrl": "/icons/filebrowser.png",
+    "defaultCompose": "services:\n  filebrowser:\n    image: filebrowser/filebrowser:latest\n    container_name: filebrowser\n    ports:\n      - 8083:80\n    volumes:\n      - ./data:/srv\n      - ./filebrowser.db:/database/filebrowser.db\n    restart: always\n",
+    "defaultEnv": ""
+  },
+  {
+    "id": "jellyfin",
+    "name": "Jellyfin",
+    "description": "The Free Software Media System. It puts you in control of managing and streaming your media.",
+    "iconUrl": "/icons/jellyfin.png",
+    "defaultCompose": "services:\n  jellyfin:\n    image: jellyfin/jellyfin:latest\n    container_name: jellyfin\n    user: 1000:1000\n    ports:\n      - 8096:8096\n    volumes:\n      - ./config:/config\n      - ./cache:/cache\n      - ./media:/media\n    restart: unless-stopped\n",
+    "defaultEnv": ""
+  },
+  {
+    "id": "gluetun",
+    "name": "Gluetun",
+    "description": "VPN client in a thin Docker container for multiple VPN providers, written in Go, and using OpenVPN or Wireguard.",
+    "iconUrl": "/icons/gluetun.png",
+    "defaultCompose": "services:\n  gluetun:\n    image: qmcgaw/gluetun:latest\n    container_name: gluetun\n    cap_add:\n      - NET_ADMIN\n    devices:\n      - /dev/net/tun:/dev/net/tun\n    ports:\n      - 8888:8888/tcp\n      - 8388:8388/tcp\n      - 8388:8388/udp\n    volumes:\n      - ./gluetun:/gluetun\n    environment:\n      - VPN_SERVICE_PROVIDER=custom\n      - VPN_TYPE=openvpn\n    restart: unless-stopped\n",
+    "defaultEnv": ""
+  }
+]

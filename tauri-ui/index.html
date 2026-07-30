@@ -518,6 +518,14 @@
                 </label>
             </div>
 
+            <div class="form-group" style="text-align: left; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+                <label for="settingsStartInTray" style="margin-bottom: 0; cursor: pointer;">Start Minimized in Tray</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="settingsStartInTray">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn-primary" id="saveSettingsBtn">Save & Restart Server</button>
                 <button class="btn-outline" id="cancelSettingsBtn">Cancel</button>
@@ -628,16 +636,39 @@
         const saveSettingsBtn = document.getElementById('saveSettingsBtn');
         const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
         const settingsError = document.getElementById('settingsError');
+        
+        let originalSettings = { username: '', port: '' };
+
+        function updateSaveButtonState() {
+            const currentUsername = document.getElementById('settingsUsername').value;
+            const currentPort = document.getElementById('settingsPort').value;
+            const currentPassword = document.getElementById('settingsPassword').value;
+            
+            const needsRestart = currentUsername !== originalSettings.username || 
+                                 currentPort !== originalSettings.port || 
+                                 currentPassword !== '';
+                                 
+            saveSettingsBtn.textContent = needsRestart ? 'Save & Restart Server' : 'Save';
+            return needsRestart;
+        }
+
+        ['settingsUsername', 'settingsPort', 'settingsPassword', 'settingsConfirmPassword', 'settingsDebugLogs', 'settingsStartInTray']
+            .forEach(id => document.getElementById(id).addEventListener('input', updateSaveButtonState));
 
         settingsBtn.addEventListener('click', async () => {
             try {
-                const [username, port] = await invoke('get_settings');
+                const [username, port, startInTray] = await invoke('get_settings');
+                originalSettings = { username, port };
+                
                 document.getElementById('settingsUsername').value = username;
                 document.getElementById('settingsPort').value = port;
                 document.getElementById('settingsPassword').value = '';
                 document.getElementById('settingsConfirmPassword').value = '';
                 document.getElementById('settingsDebugLogs').checked = enableDebugLogs;
+                document.getElementById('settingsStartInTray').checked = startInTray;
                 settingsError.style.display = 'none';
+                
+                updateSaveButtonState();
                 settingsModal.classList.add('active');
             } catch (e) {
                 appendLog('Error loading settings: ' + e);
@@ -653,6 +684,9 @@
             const password = document.getElementById('settingsPassword').value;
             const confirmPassword = document.getElementById('settingsConfirmPassword').value;
             const port = document.getElementById('settingsPort').value;
+            const startInTray = document.getElementById('settingsStartInTray').checked;
+            
+            const requiresRestart = updateSaveButtonState();
             
             enableDebugLogs = document.getElementById('settingsDebugLogs').checked;
             localStorage.setItem('debugLogs', enableDebugLogs);
@@ -670,30 +704,37 @@
                 await invoke('update_settings', { 
                     username, 
                     password: password ? password : null, 
-                    port 
+                    port,
+                    startInTray
                 });
                 
                 settingsModal.classList.remove('active');
-                appendLog('Settings saved. Restarting server...');
                 
-                // Restart server
-                await invoke('stop_server');
-                await new Promise(r => setTimeout(r, 1000));
-                await invoke('start_server');
-                
-                // Ensure button is back to "Stop Server" state
-                if (serverBtn.classList.contains('btn-success')) {
-                    serverBtn.textContent = 'Stop Server';
-                    serverBtn.classList.replace('btn-success', 'btn-danger');
-                    document.querySelector('.status-dot').style.backgroundColor = '#22c55e';
-                    document.querySelector('.status-dot').style.animation = 'pulse 2s infinite';
+                if (requiresRestart) {
+                    appendLog('Settings saved. Restarting server...');
+                    // Restart server
+                    await invoke('stop_server');
+                    await new Promise(r => setTimeout(r, 1000));
+                    await invoke('start_server');
+                    
+                    // Ensure button is back to "Stop Server" state
+                    if (serverBtn.classList.contains('btn-success')) {
+                        serverBtn.textContent = 'Stop Server';
+                        serverBtn.classList.replace('btn-success', 'btn-danger');
+                        document.querySelector('.status-dot').style.backgroundColor = '#22c55e';
+                        document.querySelector('.status-dot').style.animation = 'pulse 2s infinite';
+                    }
+                } else {
+                    appendLog('Settings saved successfully.');
                 }
+                
+                originalSettings = { username, port };
                 
             } catch (e) {
                 settingsError.textContent = e;
                 settingsError.style.display = 'block';
             } finally {
-                saveSettingsBtn.textContent = 'Save & Restart Server';
+                updateSaveButtonState();
                 saveSettingsBtn.disabled = false;
             }
         });

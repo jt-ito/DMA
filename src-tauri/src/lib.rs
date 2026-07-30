@@ -98,7 +98,7 @@ fn complete_setup(username: String, password: String, port: String) -> Result<()
 }
 
 #[tauri::command]
-fn get_settings() -> Result<(String, String), String> {
+fn get_settings() -> Result<(String, String, bool), String> {
     let mut config_dir = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .map(std::path::PathBuf::from)
@@ -109,6 +109,7 @@ fn get_settings() -> Result<(String, String), String> {
 
     let mut username = String::new();
     let mut port = "3000".to_string();
+    let mut start_in_tray = false;
 
     if let Ok(contents) = std::fs::read_to_string(&env_path) {
         for line in contents.lines() {
@@ -117,15 +118,17 @@ fn get_settings() -> Result<(String, String), String> {
                 username = line.replace("ADMIN_USERNAME=", "").replace("\"", "").replace("'", "").trim().to_string();
             } else if line.starts_with("PORT=") {
                 port = line.replace("PORT=", "").replace("\"", "").replace("'", "").trim().to_string();
+            } else if line.starts_with("START_IN_TRAY=") {
+                start_in_tray = line.replace("START_IN_TRAY=", "").replace("\"", "").replace("'", "").trim() == "true";
             }
         }
     }
     
-    Ok((username, port))
+    Ok((username, port, start_in_tray))
 }
 
 #[tauri::command]
-fn update_settings(username: String, password: Option<String>, port: String) -> Result<(), String> {
+fn update_settings(username: String, password: Option<String>, port: String, start_in_tray: bool) -> Result<(), String> {
     let mut config_dir = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .map(std::path::PathBuf::from)
@@ -165,8 +168,8 @@ fn update_settings(username: String, password: Option<String>, port: String) -> 
     };
 
     let env_content = format!(
-        "ADMIN_USERNAME=\"{}\"\nADMIN_PASSWORD_HASH=\"{}\"\nJWT_SECRET=\"{}\"\nPORT=\"{}\"\n",
-        username, final_hash, old_jwt, port
+        "ADMIN_USERNAME=\"{}\"\nADMIN_PASSWORD_HASH=\"{}\"\nJWT_SECRET=\"{}\"\nPORT=\"{}\"\nSTART_IN_TRAY=\"{}\"\n",
+        username, final_hash, old_jwt, port, start_in_tray
     );
 
     std::fs::write(env_path, env_content).map_err(|e| e.to_string())?;
@@ -423,7 +426,16 @@ pub fn run() {
             let _ = window.set_focus();
         }
     }))
-    .plugin(tauri_plugin_window_state::Builder::default().build())
+    .plugin(
+        tauri_plugin_window_state::Builder::default()
+            .with_state_flags(
+                tauri_plugin_window_state::StateFlags::SIZE
+                    | tauri_plugin_window_state::StateFlags::POSITION
+                    | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                    | tauri_plugin_window_state::StateFlags::FULLSCREEN
+            )
+            .build(),
+    )
     .invoke_handler(tauri::generate_handler![
         is_configured,
         complete_setup,
@@ -517,6 +529,32 @@ pub fn run() {
 
       // Server is no longer spawned here on boot. 
       // The frontend will manually invoke start_server once setup checks complete.
+
+      if let Some(window) = app.get_webview_window("main") {
+          let mut start_in_tray = false;
+          let mut config_dir = std::env::var("USERPROFILE")
+              .or_else(|_| std::env::var("HOME"))
+              .map(std::path::PathBuf::from)
+              .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+          config_dir.push(".docker-manager");
+          let env_path = config_dir.join(".env");
+          
+          if let Ok(contents) = std::fs::read_to_string(&env_path) {
+              for line in contents.lines() {
+                  let line = line.trim();
+                  if line.starts_with("START_IN_TRAY=") {
+                      start_in_tray = line.replace("START_IN_TRAY=", "").replace("\"", "").replace("'", "").trim() == "true";
+                      break;
+                  }
+              }
+          }
+
+          if !start_in_tray {
+              let _ = window.show();
+              let _ = window.unminimize();
+              let _ = window.set_focus();
+          }
+      }
 
       Ok(())
     })

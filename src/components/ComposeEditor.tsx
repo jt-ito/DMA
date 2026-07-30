@@ -400,6 +400,23 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
     }
   };
 
+  const saveFilePathToBackend = async (composePath: string | undefined, envPath: string | undefined) => {
+    if (!env) return;
+    const updatedEnv = { 
+      ...env, 
+      composeFilePath: composePath !== undefined ? composePath : env.composeFilePath,
+      envFilePath: envPath !== undefined ? envPath : env.envFilePath
+    };
+    try {
+      await fetch('/api/environments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedEnv)
+      });
+      setEnv(updatedEnv);
+    } catch (e) {}
+  };
+
   if (loading) {
     return <div className={styles.loading}>Loading editor...</div>;
   }
@@ -478,6 +495,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
               setEnvFilePath(filePath || '');
               setEnvContent(content || '');
               lastSavedEnvContentRef.current = content || '';
+              saveFilePathToBackend(undefined, filePath || '');
               setRemoteBrowserOpen(false);
             }
           }}
@@ -504,6 +522,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
                 onClick={() => {
                   setYamlContent(backupPrompt.content);
                   setLoadedFilePath(backupPrompt.filePath);
+                  saveFilePathToBackend(backupPrompt.filePath, undefined);
                   setSuccess("Remote file loaded successfully. Backup skipped.");
                   setError(null);
                   setBackupPrompt(null);
@@ -530,6 +549,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
                   }
                   setYamlContent(backupPrompt.content);
                   setLoadedFilePath(backupPrompt.filePath);
+                  saveFilePathToBackend(backupPrompt.filePath, undefined);
                   setBackupPrompt(null);
                 }}
               >

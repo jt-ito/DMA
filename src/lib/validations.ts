@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const EnvIdSchema = z.string().uuid().or(z.string().min(1).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Invalid environment ID format'));
 
-export const ContainerActionSchema = z.enum(['start', 'stop', 'restart', 'remove']);
+const ContainerActionSchema = z.enum(['start', 'stop', 'restart', 'remove']);
 
-export const ComposeActionSchema = z.enum(['pull', 'pull --ignore-pull-failures', 'up -d', 'stop', 'rm -f', 'prune', 'system-prune', 'rmi', 'down', 'down --rmi all', 'up -d --remove-orphans']);
+const ComposeActionSchema = z.enum(['pull', 'pull --ignore-pull-failures', 'up -d', 'stop', 'rm -f', 'prune', 'system-prune', 'rmi', 'down', 'down --rmi all', 'up -d --remove-orphans']);
 
 export const ManageContainerSchema = z.object({
   envId: EnvIdSchema,
@@ -58,3 +58,8 @@ export const DebugCommandSchema = z.object({
   cwd: z.string().optional(),
 });
 
+export const ContainerPolicySchema = z.object({
+  envId: EnvIdSchema,
+  containerId: z.string().regex(/^[a-fA-F0-9]+$/, 'Invalid container ID'),
+  policy: z.enum(['no', 'always', 'unless-stopped', 'on-failure']),
+});

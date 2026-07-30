@@ -14,6 +14,8 @@ export interface DockerContainer {
   ConfigFiles?: string;
   EnvironmentFiles?: string;
   StartedAt?: string;
+  HealthStatus?: string | null;
+  RestartPolicy?: string | null;
 }
 
 export async function getContainers(env: Environment): Promise<DockerContainer[]> {
@@ -28,7 +30,7 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
   
   let inspectOut = '';
   try {
-    const res = await executeCommand(env, 'docker', ['inspect', '--format={{.Id}}---{{json .Config.Labels}}---{{json .State.StartedAt}}', ...containerIds]);
+    const res = await executeCommand(env, 'docker', ['inspect', '--format={{.Id}}---{{json .Config.Labels}}---{{json .State}}---{{json .HostConfig.RestartPolicy.Name}}', ...containerIds]);
     inspectOut = res.stdout;
   } catch (e: any) {
     inspectOut = e.stdout || '';
@@ -38,16 +40,18 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
 
   const inspectLines = inspectOut.trim().split('\n').filter(line => line.length > 0);
   
-  const inspectMap: Record<string, { labels: any, startedAt: any }> = {};
+  const inspectMap: Record<string, { labels: any, state: any, restartPolicy: any }> = {};
   for (const line of inspectLines) {
     const parts = line.split('---');
     if (parts.length >= 3) {
       const id = parts[0];
       let labels = {};
-      let startedAt = null;
+      let state: any = {};
+      let restartPolicy = null;
       try { if (parts[1] && parts[1] !== 'null') labels = JSON.parse(parts[1]); } catch(e) {}
-      try { if (parts[2] && parts[2] !== 'null') startedAt = JSON.parse(parts[2]); } catch(e) {}
-      inspectMap[id] = { labels, startedAt };
+      try { if (parts[2] && parts[2] !== 'null') state = JSON.parse(parts[2]); } catch(e) {}
+      try { if (parts[3] && parts[3] !== 'null') restartPolicy = JSON.parse(parts[3]); } catch(e) {}
+      inspectMap[id] = { labels, state, restartPolicy };
     }
   }
 
@@ -61,7 +65,9 @@ export async function getContainers(env: Environment): Promise<DockerContainer[]
          c.WorkingDir = data.labels['com.docker.compose.project.working_dir'] || null;
          c.ConfigFiles = data.labels['com.docker.compose.project.config_files'] || null;
          c.EnvironmentFiles = data.labels['com.docker.compose.project.environment_file'] || null;
-         c.StartedAt = data.startedAt;
+         c.StartedAt = data.state?.StartedAt || null;
+         c.HealthStatus = data.state?.Health?.Status || null;
+         c.RestartPolicy = data.restartPolicy;
      }
   }
   
@@ -207,4 +213,27 @@ export async function deployCompose(env: Environment, yamlContent: string, compo
       await executeCommand(env, command);
     }
   }
+}
+
+export async function getContainerStats(env: Environment, id: string): Promise<any> {
+  const { stdout } = await executeCommand(env, 'docker', ['stats', '--no-stream', '--format', '{{json .}}', id]);
+  if (!stdout.trim()) {
+    throw new Error('No stats available');
+  }
+  return JSON.parse(stdout.trim().split('\n')[0]);
+}
+
+export async function getLocalImageDigest(env: Environment, imageName: string): Promise<string[]> {
+  try {
+    const { stdout } = await executeCommand(env, 'docker', ['inspect', '--format', '{{json .RepoDigests}}', imageName]);
+    if (stdout.trim() && stdout.trim() !== 'null') {
+      return JSON.parse(stdout.trim());
+    }
+  } catch (e) {
+    // Image might not exist or error inspecting
+  }
+  return [];
+}
+export async function updateRestartPolicy(env: Environment, id: string, policy: string): Promise<void> {
+  await executeCommand(env, 'docker', ['update', '--restart', policy, id]);
 }
