@@ -62,7 +62,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   const [policyModalOpen, setPolicyModalOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<string>('unless-stopped');
 
-  const [imageUpdates, setImageUpdates] = useState<Record<string, boolean>>({});
+  const [imageUpdates, setImageUpdates] = useState<Record<string, { available: boolean, remoteDigest: string, localDigest: string }>>({});
   
   const [remoteBrowserOpen, setRemoteBrowserOpen] = useState(false);
   const [browserTarget, setBrowserTarget] = useState<'compose' | 'env'>('compose');
@@ -252,7 +252,16 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
             .then(r => r.json())
             .then(res => {
                if (res.updateAvailable) {
-                  setImageUpdates(prev => ({ ...prev, [c.Image]: true }));
+                  const localD = res.localDigests?.[0] || 'unknown';
+                  const remoteD = res.remoteDigest || 'unknown';
+                  setImageUpdates(prev => ({ 
+                    ...prev, 
+                    [c.Image]: { 
+                      available: true, 
+                      localDigest: localD.replace('sha256:', '').substring(0, 12),
+                      remoteDigest: remoteD.replace('sha256:', '').substring(0, 12)
+                    } 
+                  }));
                }
             }).catch(() => {});
        }
@@ -774,7 +783,12 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                             onClick={() => handleUpdateCompose(c)} 
                             disabled={isLoading}
                           >
-                            <RefreshCw size={16} /> {imageUpdates[c.Image] && <span style={{ color: 'var(--accent-color)' }}><AlertCircle size={14} style={{ marginRight: 4 }} /></span>} Update
+                            {imageUpdates[c.Image]?.available && (
+                              <span>
+                                <AlertCircle color="var(--success)" size={16} style={{ marginRight: 4 }} />
+                              </span>
+                            )}
+                            <RefreshCw size={16} /> Update
                           </button>
                           <button 
                             title="Down Compose Service" 
