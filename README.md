@@ -15,6 +15,7 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 
 - **💻 Native Desktop Experience**: Powered by Tauri, enjoy a lightweight, blazing-fast native application that lives in your system tray.
 - **✨ Native Setup Wizard**: Create your administrator credentials and configure a custom server port right from the desktop window on the very first launch. The background web server securely waits to boot until you've customized your setup—no manual `.env` file editing required!
+- **🛒 App Store Templates**: Explore the built-in library to effortlessly deploy popular services (like Pi-hole, Jellyfin, Nextcloud, and more) with a single click.
 - **🔌 Multi-Environment (Local & Remote)**: Connect to your local Docker socket or manage remote servers securely over SSH (`node-ssh`).
 - **📊 Interactive Dashboard**: Real-time overview of containers, resource usage, and precise **uptime tracking** across all your environments.
 - **🌐 Network & IP Management**: Quickly view active ports and **open them directly in new browser tabs**. The app also securely fetches and displays the remote server's **Public IP address** on the fly (never permanently stored).
@@ -24,7 +25,8 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 - **🛠️ Compose Project Control**: Take control of entire application stacks! **Bring down or spin up an entire project** (all containers) simultaneously with a single click.
 - **📝 Live Compose Editor**: A built-in code editor to view and modify your `docker-compose.yml` files. Make your changes, save, and immediately restart the compose stack right from the editor!
 - **📜 Log Viewer**: Instantly view, stream, and **copy container logs** for rapid debugging without ever touching the terminal.
-- **📂 Compose File Discovery**: Effortlessly navigate your server's directories to locate and import existing `docker-compose.yml` projects without dropping into an SSH connection.
+- **📂 Compose File Discovery**: Effortlessly navigate your server's directories to locate and import existing `docker-compose.yml` projects without dropping into an SSH connection. (Selections are instantly saved to your environment in the background).
+- **⚙️ Dynamic Server Settings**: Instantly tweak UI settings (like debug logging or starting minimized in the tray) on the fly. The backend server smartly reboots itself only when core networking or credentials change.
 
 ### 🖼️ Gallery
 
