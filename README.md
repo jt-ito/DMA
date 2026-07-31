@@ -25,11 +25,12 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
   - **Pull new images** for individual items to seamlessly update your services, complete with **new version notifications** indicating when an update is available.
 - **🛠️ Compose Project Control**: Take control of entire application stacks! **Bring down or spin up an entire project** (all containers) simultaneously with a single click.
 - **📝 Live Compose Editor**: A built-in code editor to view and modify your `docker-compose.yml` files. Make your changes, save, and immediately restart the compose stack right from the editor!
-- **📜 Log Viewer**: Instantly view, stream, and **copy container logs** for rapid debugging without ever touching the terminal.
+- **📜 Log Viewer & Command Executor**: Instantly view, stream, and copy container logs. Plus, a built-in terminal executor lets you rapidly send shell commands straight to the container without ever leaving the UI.
 - **📂 Compose File Discovery**: Effortlessly navigate your server's directories to locate and import existing `docker-compose.yml` projects without dropping into an SSH connection. (Selections are instantly saved to your environment in the background).
 - **⚙️ Dynamic Server Settings**: Instantly tweak UI settings (like debug logging or starting minimized in the tray) on the fly. The backend server smartly reboots itself only when core networking or credentials change.
 - **📱 Fully Mobile-Responsive Design**: Manage your containers, compose environments, and server settings smoothly from any device. The UI seamlessly adapts to phones and tablets without sacrificing functionality.
 - **🔗 Advanced Network Operations**: Effortlessly create, view, and delete Docker networks on your local or remote machine directly from the intuitive Networks tab.
+- **🔔 Background Notifications**: Get native system notifications for container state changes, background tasks, and critical failures, keeping you informed even when the app is minimized.
 
 ### 🖼️ Gallery
 
