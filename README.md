@@ -28,6 +28,8 @@ Built on the robust combination of **Tauri** and **Next.js**, DMA allows you to 
 - **📜 Log Viewer**: Instantly view, stream, and **copy container logs** for rapid debugging without ever touching the terminal.
 - **📂 Compose File Discovery**: Effortlessly navigate your server's directories to locate and import existing `docker-compose.yml` projects without dropping into an SSH connection. (Selections are instantly saved to your environment in the background).
 - **⚙️ Dynamic Server Settings**: Instantly tweak UI settings (like debug logging or starting minimized in the tray) on the fly. The backend server smartly reboots itself only when core networking or credentials change.
+- **📱 Fully Mobile-Responsive Design**: Manage your containers, compose environments, and server settings smoothly from any device. The UI seamlessly adapts to phones and tablets without sacrificing functionality.
+- **🔗 Advanced Network Operations**: Effortlessly create, view, and delete Docker networks on your local or remote machine directly from the intuitive Networks tab.
 
 ### 🖼️ Gallery
 
