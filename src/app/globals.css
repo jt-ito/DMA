@@ -3,6 +3,7 @@
   --bg-primary: #0a0a0a;
   --bg-secondary: #171717;
   --bg-glass: rgba(23, 23, 23, 0.7);
+  --bg-sticky: #131313;
   --bg-glass-hover: rgba(38, 38, 38, 0.8);
   --border-glass: rgba(255, 255, 255, 0.05);
   --text-primary: #ededed;
@@ -19,6 +20,7 @@
   --bg-primary: #fafafa;
   --bg-secondary: #f4f4f5;
   --bg-glass: rgba(255, 255, 255, 0.8);
+  --bg-sticky: #fefefe;
   --bg-glass-hover: rgba(244, 244, 245, 0.9);
   --border-glass: rgba(0, 0, 0, 0.05);
   --text-primary: #171717;
@@ -39,6 +41,8 @@
 
 html, body {
   height: 100%;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 body {

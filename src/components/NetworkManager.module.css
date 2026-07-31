@@ -4,6 +4,7 @@
   height: 100%;
   padding: 1.5rem;
   overflow: hidden;
+  min-width: 0;
 }
 
 .panelHeader {
@@ -39,21 +40,26 @@
 
 .table {
   width: 100%;
-  border-collapse: collapse;
-}
-
-.table th, .table td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .table th {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-glass);
   font-weight: 600;
   color: var(--text-secondary);
   position: sticky;
   top: 0;
-  background: rgba(20, 20, 20, 0.95);
+  background: var(--bg-sticky);
+  z-index: 5;
+}
+
+.table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .table tbody tr:hover {
@@ -84,4 +90,23 @@
 .actionBtn.danger:hover {
   background: var(--danger);
   color: white;
+}
+
+@media (max-width: 768px) {
+  .actionsColumn {
+    position: sticky;
+    right: 0;
+    background: var(--bg-sticky);
+    box-shadow: 1px 0 0 var(--bg-sticky);
+    transform: translateZ(0);
+    z-index: 10;
+  }
+  .nameColumn {
+    position: sticky;
+    left: 0;
+    background: var(--bg-sticky);
+    box-shadow: -1px 0 0 var(--bg-sticky);
+    transform: translateZ(0);
+    z-index: 10;
+  }
 }

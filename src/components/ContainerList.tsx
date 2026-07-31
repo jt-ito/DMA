@@ -684,7 +684,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <th className={styles.nameColumn} onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   Name {sortColumn === 'name' && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                 </div>
@@ -704,7 +704,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                   Compose Project {sortColumn === 'composeProject' && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
                 </div>
               </th>
-              <th>Actions</th>
+              <th className={styles.actionsColumn}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -727,7 +727,8 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
               
               return (
                 <tr key={c.Names} className={isLoading ? styles.loadingRow : ''}>
-                  <td className={styles.nameCell}>
+                  <td className={styles.nameColumn}>
+                    <div className={styles.nameCell}>
                     <strong>{c.Names}</strong>
                     <span className={styles.idText}>{c.ID.substring(0, 12)}</span>
                     {(() => {
@@ -763,6 +764,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                         </div>
                       );
                     })()}
+                    </div>
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -785,7 +787,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                       </div>
                     ) : '-'}
                   </td>
-                  <td>
+                  <td className={styles.actionsColumn}>
                     <div className={styles.actions}>
                       {isRunning ? (
                         <button title="Stop" className={styles.actionBtn} onClick={() => handleAction(c, 'stop')} disabled={isLoading}>
@@ -834,7 +836,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                                 <AlertCircle color="var(--success)" size={16} style={{ marginRight: 4 }} />
                               </span>
                             )}
-                            <RefreshCw size={16} /> Update
+                            <RefreshCw size={16} /> <span className={styles.hideMobileText}>Update</span>
                           </button>
                           <button 
                             title="Down Compose Service" 
@@ -842,7 +844,7 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
                             onClick={() => handleDownCompose(c)} 
                             disabled={isLoading}
                           >
-                            <ShieldAlert size={16} /> Down Service
+                            <ShieldAlert size={16} /> <span className={styles.hideMobileText}>Down Service</span>
                           </button>
                         </>
                       )}

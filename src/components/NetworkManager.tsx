@@ -217,7 +217,7 @@ export function NetworkManager({ envId }: Props) {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th onClick={() => handleSort('Name')} style={{ cursor: 'pointer' }}>
+                <th className={styles.nameColumn} onClick={() => handleSort('Name')} style={{ cursor: 'pointer' }}>
                   Name {sortColumn === 'Name' && (sortDirection === 'asc' ? <ArrowUp size={12} style={{display:'inline'}}/> : <ArrowDown size={12} style={{display:'inline'}}/>)}
                 </th>
                 <th onClick={() => handleSort('Driver')} style={{ cursor: 'pointer' }}>
@@ -226,16 +226,16 @@ export function NetworkManager({ envId }: Props) {
                 <th onClick={() => handleSort('Scope')} style={{ cursor: 'pointer' }}>
                   Scope {sortColumn === 'Scope' && (sortDirection === 'asc' ? <ArrowUp size={12} style={{display:'inline'}}/> : <ArrowDown size={12} style={{display:'inline'}}/>)}
                 </th>
-                <th style={{ width: '50px' }}></th>
+                <th className={styles.actionsColumn} style={{ width: '50px' }}></th>
               </tr>
             </thead>
             <tbody>
               {sortedNetworks.map(net => (
                 <tr key={net.Name || net.ID || net.Id}>
-                  <td style={{ fontFamily: 'monospace' }}>{net.Name}</td>
+                  <td className={styles.nameColumn} style={{ fontFamily: 'monospace' }}>{net.Name}</td>
                   <td>{net.Driver}</td>
                   <td>{net.Scope}</td>
-                  <td>
+                  <td className={styles.actionsColumn}>
                     <button 
                       className={`${styles.actionBtn} ${styles.danger}`} 
                       onClick={() => handleDelete(net)}

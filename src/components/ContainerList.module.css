@@ -4,6 +4,7 @@
   flex-direction: column;
   gap: 1.5rem;
   position: relative;
+  min-width: 0;
 }
 
 .panelHeader {
@@ -29,7 +30,8 @@
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
 }
 
@@ -217,6 +219,30 @@
   }
   .imageCell {
     max-width: 120px;
+  }
+  .actionsColumn {
+    position: sticky;
+    right: 0;
+    background: var(--bg-sticky);
+    box-shadow: 1px 0 0 var(--bg-sticky);
+    transform: translateZ(0);
+    z-index: 10;
+  }
+  .nameColumn {
+    position: sticky;
+    left: 0;
+    background: var(--bg-sticky);
+    box-shadow: -1px 0 0 var(--bg-sticky);
+    transform: translateZ(0);
+    z-index: 10;
+  }
+  .actions {
+    flex-wrap: wrap;
+    max-width: 140px;
+    justify-content: flex-end;
+  }
+  .hideMobileText {
+    display: none;
   }
 }
 
