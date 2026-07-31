@@ -165,6 +165,12 @@ input:checked + .slider:before {
   color: var(--success);
 }
 
+@media (max-width: 768px) {
+  .envFileContainer, .actions {
+    flex-wrap: wrap;
+  }
+}
+
 .envFileContainer {
   flex: 1;
   display: flex;

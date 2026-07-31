@@ -5,13 +5,15 @@ import { Sidebar } from '@/components/Sidebar';
 import { ContainerList } from '@/components/ContainerList';
 import { ComposeEditor } from '@/components/ComposeEditor';
 import { TemplateLibrary } from '@/components/TemplateLibrary';
+import { NetworkManager } from '@/components/NetworkManager';
 import { CustomModal } from '@/components/CustomModal';
+import { BackgroundWatcher } from '@/components/BackgroundWatcher';
 import { Environment } from '@/lib/executor';
 import styles from './page.module.css';
 
 export default function Home() {
   const [selectedEnv, setSelectedEnv] = useState<Environment | null>(null);
-  const [activeTab, setActiveTab] = useState<'containers' | 'compose' | 'templates'>('containers');
+  const [activeTab, setActiveTab] = useState<'containers' | 'compose' | 'networks' | 'templates'>('containers');
   const [isDeploying, setIsDeploying] = useState(false);
   
   // Public IP state
@@ -52,13 +54,14 @@ export default function Home() {
 
   return (
     <div className={styles.container}>
+      <BackgroundWatcher />
       <Sidebar onSelectEnv={handleSelectEnv} selectedEnvId={selectedEnv?.id || null} />
       
       <main className={styles.main}>
         {selectedEnv ? (
           <>
             <header className={styles.header}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <h1>{selectedEnv.name}</h1>
                   <p className={styles.subtitle}>Manage your containers and compose services</p>
@@ -104,6 +107,12 @@ export default function Home() {
                     Containers
                   </button>
                   <button 
+                    className={`${styles.tabBtn} ${activeTab === 'networks' ? styles.activeTab : ''}`}
+                    onClick={() => setActiveTab('networks')}
+                  >
+                    Networks
+                  </button>
+                  <button 
                     className={`${styles.tabBtn} ${activeTab === 'compose' ? styles.activeTab : ''}`}
                     onClick={() => setActiveTab('compose')}
                   >
@@ -136,6 +145,9 @@ export default function Home() {
                         }
                       }}
                     />
+                  </div>
+                  <div style={{ display: activeTab === 'networks' ? 'block' : 'none', flex: 1, height: '100%' }}>
+                    <NetworkManager key={`networks-${selectedEnv.id}`} envId={selectedEnv.id} />
                   </div>
                   <div style={{ display: activeTab === 'templates' ? 'block' : 'none', flex: 1, height: '100%' }}>
                     <TemplateLibrary 

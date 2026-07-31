@@ -237,3 +237,29 @@ export async function getLocalImageDigest(env: Environment, imageName: string): 
 export async function updateRestartPolicy(env: Environment, id: string, policy: string): Promise<void> {
   await executeCommand(env, 'docker', ['update', '--restart', policy, id]);
 }
+
+export interface DockerNetwork {
+  Name: string;
+  Id: string;
+  Driver: string;
+  Scope: string;
+}
+
+export async function getNetworks(env: Environment): Promise<DockerNetwork[]> {
+  try {
+    const { stdout } = await executeCommand(env, 'docker', ['network', 'ls', '--format', '{{json .}}']);
+    const lines = stdout.trim().split('\n').filter(line => line.length > 0);
+    return lines.map(line => JSON.parse(line));
+  } catch (e) {
+    console.error("Failed to list docker networks:", e);
+    return [];
+  }
+}
+
+export async function createNetwork(env: Environment, name: string): Promise<void> {
+  await executeCommand(env, 'docker', ['network', 'create', name]);
+}
+
+export async function removeNetwork(env: Environment, nameOrId: string): Promise<void> {
+  await executeCommand(env, 'docker', ['network', 'rm', nameOrId]);
+}

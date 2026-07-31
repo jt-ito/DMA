@@ -45,6 +45,8 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
   const [browserTarget, setBrowserTarget] = useState<'compose' | 'env'>('compose');
   const [pruneImages, setPruneImages] = useState(false);
 
+
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSelection = useRef<{ start: number; end: number } | null>(null);
   const lastSavedContentRef = useRef<string>('');
@@ -438,7 +440,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
       {success && <div className={styles.success}>{success}</div>}
 
       <div className={styles.controls}>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
             className="glass-button" 
             onClick={() => { setBrowserTarget('compose'); setRemoteBrowserOpen(true); }}
@@ -457,6 +459,8 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
                 Switch to {activeEditor === 'compose' ? '.env' : 'Compose'}
               </button>
             )}
+          
+
         </div>
         {loadedFilePath && (
           <div className={styles.envFileContainer}>
@@ -467,7 +471,7 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
               readOnly 
               value={envFilePath ? truncatePath(envFilePath) : 'Auto-detected'} 
               className={styles.input} 
-              style={{ flex: 'none', width: '300px' }}
+              style={{ flex: '1 1 200px', minWidth: 0, maxWidth: '300px' }}
               title={envFilePath || 'Auto-detected'}
             />
           </div>
@@ -596,6 +600,8 @@ export function ComposeEditor({ envId, onDeployStart, onDeployEnd }: Props) {
           )}
         </button>
       </div>
+
+
     </div>
   );
 }

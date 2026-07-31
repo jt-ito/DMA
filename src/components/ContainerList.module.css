@@ -194,6 +194,32 @@
   white-space: pre-wrap;
 }
 
+.logsContainer pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .panel {
+    padding: 1rem;
+  }
+  .panelHeader {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .table th,
+  .table td {
+    padding: 0.5rem;
+  }
+  .imageCell {
+    max-width: 120px;
+  }
+}
+
 .modalOverlay {
   position: fixed;
   top: 0;
@@ -276,6 +302,48 @@
   flex: 1;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+.execInput {
+  flex: 1;
+  background: #111;
+  color: #00bcd4;
+  font-family: monospace;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.execInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.execInput::placeholder {
+  color: rgba(0, 188, 212, 0.6);
+}
+
+.execButton {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 1.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.execButton:hover:not(:disabled) {
+  background: var(--accent-hover, #4f46e5);
+}
+
+.execButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .deployOverlay {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { Server, Plus, Sun, Moon, LogOut, Power, PowerOff } from 'lucide-react';
+import { Server, Plus, Sun, Moon, LogOut, Power, PowerOff, Menu } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import styles from './Sidebar.module.css';
 import { Environment } from '@/lib/executor';
@@ -16,6 +16,7 @@ export function Sidebar({ onSelectEnv, selectedEnvId }: SidebarProps) {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -70,8 +71,17 @@ export function Sidebar({ onSelectEnv, selectedEnvId }: SidebarProps) {
   };
 
   return (
-    <div className={styles.sidebar}>
-      <div className={styles.header}>
+    <>
+      <button className={styles.hamburger} onClick={() => setIsMobileOpen(true)}>
+        <Menu size={24} />
+      </button>
+
+      {isMobileOpen && (
+        <div className={styles.mobileBackdrop} onClick={() => setIsMobileOpen(false)} />
+      )}
+
+      <div className={`${styles.sidebar} ${isMobileOpen ? styles.mobileOpen : ''}`}>
+        <div className={styles.header}>
         <h2>Environments</h2>
         <button className={styles.iconButton} onClick={toggleTheme}>
           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
@@ -86,6 +96,7 @@ export function Sidebar({ onSelectEnv, selectedEnvId }: SidebarProps) {
             onClick={() => {
               localStorage.setItem('selectedEnvId', env.id);
               onSelectEnv(env);
+              setIsMobileOpen(false);
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
@@ -121,6 +132,7 @@ export function Sidebar({ onSelectEnv, selectedEnvId }: SidebarProps) {
           onSelectEnv(env);
         }} 
       />
-    </div>
+      </div>
+    </>
   );
 }

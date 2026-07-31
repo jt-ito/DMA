@@ -1,24 +1,24 @@
-use tauri::{Manager, Emitter};
-use std::process::{Command, Stdio};
+use bcrypt::{hash, DEFAULT_COST};
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
+use std::io::{BufRead, BufReader};
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
-use std::io::{BufRead, BufReader};
-use std::thread;
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use tauri::{
-    tray::TrayIconBuilder,
     menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
 };
-use rand::{thread_rng, Rng};
-use rand::distributions::Alphanumeric;
-use bcrypt::{hash, DEFAULT_COST};
+use tauri::{Emitter, Manager};
 
 fn get_configured_port() -> String {
     let mut config_dir = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-    
+
     config_dir.push(".docker-manager");
     config_dir.push(".env");
 
@@ -26,7 +26,12 @@ fn get_configured_port() -> String {
         for line in contents.lines() {
             let line = line.trim();
             if line.starts_with("PORT=") {
-                return line.replace("PORT=", "").replace("\"", "").replace("'", "").trim().to_string();
+                return line
+                    .replace("PORT=", "")
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .trim()
+                    .to_string();
             }
         }
     }
@@ -43,7 +48,7 @@ fn is_configured() -> bool {
         .or_else(|_| std::env::var("HOME"))
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-    
+
     config_dir.push(".docker-manager");
     config_dir.push(".env");
 
@@ -72,7 +77,7 @@ fn complete_setup(username: String, password: String, port: String) -> Result<()
         .or_else(|_| std::env::var("HOME"))
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-    
+
     config_dir.push(".docker-manager");
     let env_path = config_dir.join(".env");
 
@@ -103,7 +108,7 @@ fn get_settings() -> Result<(String, String, bool), String> {
         .or_else(|_| std::env::var("HOME"))
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-    
+
     config_dir.push(".docker-manager");
     let env_path = config_dir.join(".env");
 
@@ -115,25 +120,45 @@ fn get_settings() -> Result<(String, String, bool), String> {
         for line in contents.lines() {
             let line = line.trim();
             if line.starts_with("ADMIN_USERNAME=") {
-                username = line.replace("ADMIN_USERNAME=", "").replace("\"", "").replace("'", "").trim().to_string();
+                username = line
+                    .replace("ADMIN_USERNAME=", "")
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .trim()
+                    .to_string();
             } else if line.starts_with("PORT=") {
-                port = line.replace("PORT=", "").replace("\"", "").replace("'", "").trim().to_string();
+                port = line
+                    .replace("PORT=", "")
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .trim()
+                    .to_string();
             } else if line.starts_with("START_IN_TRAY=") {
-                start_in_tray = line.replace("START_IN_TRAY=", "").replace("\"", "").replace("'", "").trim() == "true";
+                start_in_tray = line
+                    .replace("START_IN_TRAY=", "")
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .trim()
+                    == "true";
             }
         }
     }
-    
+
     Ok((username, port, start_in_tray))
 }
 
 #[tauri::command]
-fn update_settings(username: String, password: Option<String>, port: String, start_in_tray: bool) -> Result<(), String> {
+fn update_settings(
+    username: String,
+    password: Option<String>,
+    port: String,
+    start_in_tray: bool,
+) -> Result<(), String> {
     let mut config_dir = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-    
+
     config_dir.push(".docker-manager");
     let env_path = config_dir.join(".env");
 
@@ -144,9 +169,19 @@ fn update_settings(username: String, password: Option<String>, port: String, sta
         for line in contents.lines() {
             let line = line.trim();
             if line.starts_with("ADMIN_PASSWORD_HASH=") {
-                old_hash = line.replace("ADMIN_PASSWORD_HASH=", "").replace("\"", "").replace("'", "").trim().to_string();
+                old_hash = line
+                    .replace("ADMIN_PASSWORD_HASH=", "")
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .trim()
+                    .to_string();
             } else if line.starts_with("JWT_SECRET=") {
-                old_jwt = line.replace("JWT_SECRET=", "").replace("\"", "").replace("'", "").trim().to_string();
+                old_jwt = line
+                    .replace("JWT_SECRET=", "")
+                    .replace("\"", "")
+                    .replace("'", "")
+                    .trim()
+                    .to_string();
             }
         }
     }
@@ -228,7 +263,7 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
 
     let port = get_configured_port();
     kill_port_process(&port);
-    
+
     let mut cmd = if cfg!(debug_assertions) {
         // Dev Mode
         #[cfg(target_os = "windows")]
@@ -249,11 +284,18 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
         let mut node_cwd = std::path::PathBuf::new();
         if let Ok(resource_dir) = app.path().resource_dir() {
             let paths_to_check = vec![
-                resource_dir.join("_up_").join(".next").join("standalone").join("start.js"),
-                resource_dir.join(".next").join("standalone").join("start.js"),
+                resource_dir
+                    .join("_up_")
+                    .join(".next")
+                    .join("standalone")
+                    .join("start.js"),
+                resource_dir
+                    .join(".next")
+                    .join("standalone")
+                    .join("start.js"),
                 resource_dir.join("start.js"),
             ];
-            
+
             for path in paths_to_check {
                 if path.exists() {
                     start_js_path = path.clone();
@@ -262,14 +304,15 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
                 }
             }
         }
-        
+
         if !start_js_path.exists() {
-            let err_msg = "Failed to find start.js in resource directory. Ensure resources are bundled.";
+            let err_msg =
+                "Failed to find start.js in resource directory. Ensure resources are bundled.";
             eprintln!("{}", err_msg);
             let _ = app.emit("server-log", format!("ERROR: {}", err_msg));
             return Err(err_msg.to_string());
         }
-        
+
         let strip_unc = |p: &std::path::Path| -> String {
             let s = p.to_string_lossy().into_owned();
             if s.starts_with("\\\\?\\") {
@@ -280,7 +323,8 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
         };
 
         let mut c = Command::new("node");
-        c.arg(strip_unc(&start_js_path)).current_dir(strip_unc(&node_cwd));
+        c.arg(strip_unc(&start_js_path))
+            .current_dir(strip_unc(&node_cwd));
         c
     };
 
@@ -289,14 +333,14 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
 
     let port = get_configured_port();
     cmd.env("PORT", port)
-       .stdout(Stdio::piped())
-       .stderr(Stdio::piped());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     match cmd.spawn() {
         Ok(mut child) => {
             let stdout = child.stdout.take();
             let stderr = child.stderr.take();
-            
+
             if let Ok(mut child_opt) = state.child.lock() {
                 *child_opt = Some(child);
             }
@@ -320,11 +364,12 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
                     for line in reader.lines() {
                         if let Ok(line) = line {
                             eprintln!("[Next.js Error] {}", line);
-                            let emit_line = if line.starts_with("ERROR: ") || line.starts_with("WARNING: ") {
-                                line.clone()
-                            } else {
-                                format!("ERROR: {}", line)
-                            };
+                            let emit_line =
+                                if line.starts_with("ERROR: ") || line.starts_with("WARNING: ") {
+                                    line.clone()
+                                } else {
+                                    format!("ERROR: {}", line)
+                                };
                             let _ = app_handle_clone.emit("server-log", emit_line);
                         }
                     }
@@ -337,7 +382,7 @@ fn start_server(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<
             return Err(e.to_string());
         }
     }
-    
+
     Ok(())
 }
 
@@ -346,7 +391,7 @@ fn kill_process_tree(pid: u32) {
     use sysinfo::System;
     let mut sys = System::new_all();
     sys.refresh_all();
-    
+
     let mut to_kill = vec![pid];
     let mut new_found = true;
     while new_found {
@@ -360,7 +405,7 @@ fn kill_process_tree(pid: u32) {
             }
         }
     }
-    
+
     for pid_to_kill in to_kill.iter().rev() {
         if let Some(process) = sys.process(sysinfo::Pid::from_u32(*pid_to_kill)) {
             process.kill();
@@ -419,145 +464,154 @@ fn open_browser() -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-    }))
-    .plugin(
-        tauri_plugin_window_state::Builder::default()
-            .with_state_flags(
-                tauri_plugin_window_state::StateFlags::SIZE
-                    | tauri_plugin_window_state::StateFlags::POSITION
-                    | tauri_plugin_window_state::StateFlags::MAXIMIZED
-                    | tauri_plugin_window_state::StateFlags::FULLSCREEN
-            )
-            .build(),
-    )
-    .invoke_handler(tauri::generate_handler![
-        is_configured,
-        complete_setup,
-        get_settings,
-        update_settings,
-        start_server,
-        stop_server,
-        minimize_window,
-        close_app,
-        open_browser
-    ])
-    .on_window_event(|window, event| match event {
-        tauri::WindowEvent::CloseRequested { api, .. } => {
-            let state = window.app_handle().state::<AppState>();
-            let is_running = if let Ok(child_opt) = state.child.lock() {
-                child_opt.is_some()
-            } else {
-                false
-            };
-
-            if is_running {
-                api.prevent_close();
-                let _ = window.emit("close-requested", ());
+    tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
             }
-        }
-        _ => {}
-    })
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+        }))
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                        | tauri_plugin_window_state::StateFlags::FULLSCREEN,
+                )
+                .build(),
+        )
+        .invoke_handler(tauri::generate_handler![
+            is_configured,
+            complete_setup,
+            get_settings,
+            update_settings,
+            start_server,
+            stop_server,
+            minimize_window,
+            close_app,
+            open_browser
+        ])
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                let state = window.app_handle().state::<AppState>();
+                let is_running = if let Ok(child_opt) = state.child.lock() {
+                    child_opt.is_some()
+                } else {
+                    false
+                };
 
-      let child_mutex = Arc::new(Mutex::new(None::<std::process::Child>));
-      app.manage(AppState { child: child_mutex.clone() });
-      let child_mutex_for_tray = child_mutex.clone();
+                if is_running {
+                    api.prevent_close();
+                    let _ = window.emit("close-requested", ());
+                }
+            }
+            _ => {}
+        })
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
 
-      let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-      let browser_i = MenuItem::with_id(app, "browser", "Open Web UI", true, None::<&str>)?;
-      let show_i = MenuItem::with_id(app, "show", "Open Launcher", true, None::<&str>)?;
-      let menu = Menu::with_items(app, &[&show_i, &browser_i, &quit_i])?;
+            let child_mutex = Arc::new(Mutex::new(None::<std::process::Child>));
+            app.manage(AppState {
+                child: child_mutex.clone(),
+            });
+            let child_mutex_for_tray = child_mutex.clone();
 
-      let _tray = TrayIconBuilder::new()
-          .icon(app.default_window_icon().unwrap().clone())
-          .menu(&menu)
-          .on_menu_event(move |app, event| match event.id.as_ref() {
-              "quit" => {
-                  if let Ok(mut child_opt) = child_mutex_for_tray.lock() {
-                      if let Some(child) = child_opt.as_mut() {
-                          #[cfg(target_os = "windows")]
-                          {
-                              kill_process_tree(child.id());
-                          }
-                          #[cfg(not(target_os = "windows"))]
-                          {
-                              let _ = child.kill();
-                          }
-                      }
-                  }
-                  app.exit(0);
-              }
-              "browser" => {
-                  let port = get_configured_port();
-                  let _ = open::that(format!("http://localhost:{}", port));
-              }
-              "show" => {
-                  if let Some(window) = app.get_webview_window("main") {
-                      let _ = window.show();
-                      let _ = window.set_focus();
-                  }
-              }
-              _ => {}
-          })
-          .on_tray_icon_event(|tray, event| {
-              if let tauri::tray::TrayIconEvent::Click {
-                  button: tauri::tray::MouseButton::Left,
-                  button_state: tauri::tray::MouseButtonState::Up,
-                  ..
-              } = event {
-                  let app = tray.app_handle();
-                  if let Some(window) = app.get_webview_window("main") {
-                      let _ = window.show();
-                      let _ = window.set_focus();
-                  }
-              }
-          })
-          .build(app)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let browser_i = MenuItem::with_id(app, "browser", "Open Web UI", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Open Launcher", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &browser_i, &quit_i])?;
 
-      // Server is no longer spawned here on boot. 
-      // The frontend will manually invoke start_server once setup checks complete.
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "quit" => {
+                        if let Ok(mut child_opt) = child_mutex_for_tray.lock() {
+                            if let Some(child) = child_opt.as_mut() {
+                                #[cfg(target_os = "windows")]
+                                {
+                                    kill_process_tree(child.id());
+                                }
+                                #[cfg(not(target_os = "windows"))]
+                                {
+                                    let _ = child.kill();
+                                }
+                            }
+                        }
+                        app.exit(0);
+                    }
+                    "browser" => {
+                        let port = get_configured_port();
+                        let _ = open::that(format!("http://localhost:{}", port));
+                    }
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
 
-      if let Some(window) = app.get_webview_window("main") {
-          let mut start_in_tray = false;
-          let mut config_dir = std::env::var("USERPROFILE")
-              .or_else(|_| std::env::var("HOME"))
-              .map(std::path::PathBuf::from)
-              .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-          config_dir.push(".docker-manager");
-          let env_path = config_dir.join(".env");
-          
-          if let Ok(contents) = std::fs::read_to_string(&env_path) {
-              for line in contents.lines() {
-                  let line = line.trim();
-                  if line.starts_with("START_IN_TRAY=") {
-                      start_in_tray = line.replace("START_IN_TRAY=", "").replace("\"", "").replace("'", "").trim() == "true";
-                      break;
-                  }
-              }
-          }
+            // Server is no longer spawned here on boot.
+            // The frontend will manually invoke start_server once setup checks complete.
 
-          if !start_in_tray {
-              let _ = window.show();
-              let _ = window.unminimize();
-              let _ = window.set_focus();
-          }
-      }
+            if let Some(window) = app.get_webview_window("main") {
+                let mut start_in_tray = false;
+                let mut config_dir = std::env::var("USERPROFILE")
+                    .or_else(|_| std::env::var("HOME"))
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+                config_dir.push(".docker-manager");
+                let env_path = config_dir.join(".env");
 
-      Ok(())
-    })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+                if let Ok(contents) = std::fs::read_to_string(&env_path) {
+                    for line in contents.lines() {
+                        let line = line.trim();
+                        if line.starts_with("START_IN_TRAY=") {
+                            start_in_tray = line
+                                .replace("START_IN_TRAY=", "")
+                                .replace("\"", "")
+                                .replace("'", "")
+                                .trim()
+                                == "true";
+                            break;
+                        }
+                    }
+                }
+
+                if !start_in_tray {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+            }
+
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

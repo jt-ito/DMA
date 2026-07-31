@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   description: 'Manage Docker containers locally and remotely',
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: {

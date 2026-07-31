@@ -100,7 +100,7 @@
 }
 
 .disableBtn {
-  background: transparent;
+  background: none;
   border: none;
   color: inherit;
   cursor: pointer;
@@ -110,10 +110,55 @@
   align-items: center;
   justify-content: center;
   opacity: 0.5;
-  transition: all 0.2s;
+  transition: opacity 0.2s;
 }
 
 .disableBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
   opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hamburger {
+  display: none;
+}
+.mobileBackdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hamburger {
+    display: flex;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 100;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 0.5rem;
+    cursor: pointer;
+  }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 101;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  .sidebar.mobileOpen {
+    transform: translateX(0);
+  }
+  .mobileBackdrop {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+  }
 }

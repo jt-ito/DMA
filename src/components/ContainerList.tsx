@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown, Copy, Activity, Settings, AlertCircle } from 'lucide-react';
+import { Play, Square, RotateCcw, Trash2, ShieldAlert, FileText, X, RefreshCw, Download, ArrowUp, ArrowDown, Copy, Activity, Settings, AlertCircle, Terminal } from 'lucide-react';
 import { DockerContainer } from '@/lib/docker';
 import { CustomModal } from './CustomModal';
 import { RemoteFileBrowser } from './RemoteFileBrowser';
@@ -54,6 +54,15 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
   const [updatingAll, setUpdatingAll] = useState(false);
   const [updateAllStatus, setUpdateAllStatus] = useState<string>('');
   const logsContainerRef = useRef<HTMLPreElement>(null);
+
+  const [execCommandText, setExecCommandText] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [execOutput, setExecOutput] = useState<{ stdout: string; stderr: string; code?: number } | null>(null);
+  const execInputRef = useRef<HTMLInputElement>(null);
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [showExecSection, setShowExecSection] = useState(false);
+  const [execHistoryLines, setExecHistoryLines] = useState<{ cmd: string, stdout: string, stderr: string, code?: number }[]>([]);
 
   const [statsModalOpen, setStatsModalOpen] = useState(false);
   const [currentStats, setCurrentStats] = useState<any>(null);
@@ -520,6 +529,10 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     setCurrentLogs('');
     setLogsLoading(true);
     setLogsModalOpen(true);
+    setExecCommandText('');
+    setExecOutput(null);
+    setShowExecSection(false);
+    setExecHistoryLines([]);
     
     try {
       const res = await fetch(`/api/logs?envId=${envId}&containerId=${container.ID}`);
@@ -532,6 +545,39 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       setCurrentLogs(`Error fetching logs: ${e.message}`);
     }
     setLogsLoading(false);
+  };
+
+  const handleExecCommand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!execCommandText.trim() || !selectedContainerId) return;
+
+    setIsExecuting(true);
+    setExecOutput(null);
+    const cmd = execCommandText.trim();
+    if (commandHistory[commandHistory.length - 1] !== cmd) {
+      setCommandHistory(prev => [...prev, cmd]);
+    }
+    setHistoryIndex(-1);
+
+    try {
+      const res = await apiPost('/api/containers/exec', {
+        envId,
+        containerId: selectedContainerId,
+        command: cmd,
+      });
+      const data = await res.json();
+      setExecHistoryLines(prev => [...prev, { cmd, ...data.result }]);
+      setExecCommandText('');
+      setTimeout(scrollToBottom, 100);
+    } catch (err: any) {
+      setExecHistoryLines(prev => [...prev, {
+        cmd,
+        stdout: '',
+        stderr: err.message || String(err),
+      }]);
+      setTimeout(scrollToBottom, 100);
+    }
+    setIsExecuting(false);
   };
 
   useEffect(() => {
@@ -818,6 +864,20 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
             <div className={styles.modalHeader}>
               <h3>Logs: {selectedContainerName}</h3>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button title="Execute Command" className={`${styles.actionBtn} ${showExecSection ? styles.active : ''}`} onClick={() => {
+                  setShowExecSection(prev => {
+                    const next = !prev;
+                    if (next) {
+                      setTimeout(() => {
+                        scrollToBottom();
+                        execInputRef.current?.focus();
+                      }, 100);
+                    }
+                    return next;
+                  });
+                }}>
+                  <Terminal size={18} />
+                </button>
                 <button title="Export Logs" className={styles.actionBtn} onClick={handleExportLogs}>
                   <Download size={18} />
                 </button>
@@ -839,7 +899,58 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
               {logsLoading ? (
                 <div className={styles.loading}>Fetching logs...</div>
               ) : (
-                <pre className={styles.logsPre} ref={logsContainerRef}>{currentLogs || 'No logs available.'}</pre>
+                <>
+                  <pre className={styles.logsPre} ref={logsContainerRef}>
+                    {currentLogs || 'No logs available.'}
+                    {execHistoryLines.map((run, i) => (
+                      <div key={i} style={{ marginTop: i === 0 && !currentLogs ? '0' : '1rem' }}>
+                        <div style={{ color: '#00bcd4', fontWeight: 'bold' }}>$ {run.cmd}</div>
+                        {run.stdout && <div style={{ color: '#00bcd4' }}>{run.stdout}</div>}
+                        {run.stderr && <div style={{ color: '#f44336' }}>{run.stderr}</div>}
+                        {run.code !== 0 && run.code !== undefined && <div style={{ color: '#f44336' }}>[Exit code: {run.code}]</div>}
+                      </div>
+                    ))}
+                  </pre>
+                  
+                  {showExecSection && (
+                    <div className={styles.execSection} style={{ marginTop: '1rem', background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <form onSubmit={handleExecCommand} style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input 
+                          ref={execInputRef}
+                          type="text" 
+                          className={styles.execInput} 
+                          placeholder="e.g. ls -la /app" 
+                          value={execCommandText}
+                          onChange={e => setExecCommandText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              if (commandHistory.length > 0) {
+                                const nextIndex = historyIndex < commandHistory.length - 1 ? historyIndex + 1 : historyIndex;
+                                setHistoryIndex(nextIndex);
+                                setExecCommandText(commandHistory[commandHistory.length - 1 - nextIndex]);
+                              }
+                            } else if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              if (historyIndex > 0) {
+                                const nextIndex = historyIndex - 1;
+                                setHistoryIndex(nextIndex);
+                                setExecCommandText(commandHistory[commandHistory.length - 1 - nextIndex]);
+                              } else if (historyIndex === 0) {
+                                setHistoryIndex(-1);
+                                setExecCommandText('');
+                              }
+                            }
+                          }}
+                          disabled={isExecuting}
+                        />
+                        <button type="submit" className={styles.execButton} disabled={isExecuting || !execCommandText.trim()}>
+                          {isExecuting ? 'Running...' : 'Run'}
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -63,3 +63,9 @@ export const ContainerPolicySchema = z.object({
   containerId: z.string().regex(/^[a-fA-F0-9]+$/, 'Invalid container ID'),
   policy: z.enum(['no', 'always', 'unless-stopped', 'on-failure']),
 });
+
+export const ContainerExecSchema = z.object({
+  envId: EnvIdSchema,
+  containerId: z.string().regex(/^[a-fA-F0-9]+$/, 'Invalid container ID'),
+  command: z.string().min(1).max(2048),
+});
