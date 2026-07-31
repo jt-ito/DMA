@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
-import { Environment, DockerContainer } from '@/lib/executor';
+import { Environment } from '@/lib/executor';
+import { DockerContainer } from '@/lib/docker';
 
 export function BackgroundWatcher() {
   const previousStates = useRef<Record<string, DockerContainer>>({});
