@@ -1,6 +1,20 @@
 import type { NextConfig } from "next";
 import fs from "fs";
 import path from "path";
+import os from "os";
+
+function getLocalIps() {
+  const interfaces = os.networkInterfaces();
+  const ips: string[] = [];
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        ips.push(iface.address);
+      }
+    }
+  }
+  return ips;
+}
 
 const configDir = path.join(process.env.USERPROFILE || process.env.HOME || process.cwd(), '.docker-manager');
 const envPath = path.join(configDir, '.env');
@@ -22,6 +36,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["ssh2", "node-ssh"],
   poweredByHeader: false,
+  // @ts-ignore - property might be missing in Next.js types
+  allowedDevOrigins: getLocalIps(),
   async headers() {
     return [
       {

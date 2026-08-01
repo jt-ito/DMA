@@ -205,6 +205,74 @@
   word-break: break-all;
 }
 
+.customCheckbox {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+.customCheckbox input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+.checkmark {
+  width: 20px;
+  height: 20px;
+  background-color: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.customCheckbox:hover input ~ .checkmark {
+  background-color: var(--bg-secondary);
+}
+.customCheckbox input:checked ~ .checkmark {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+.checkmark:after {
+  content: "";
+  display: none;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+.customCheckbox input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.bulkActions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.desktopBulkActionBar {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mobileCards { display: none; }
+
 @media (max-width: 768px) {
   .panel {
     padding: 1rem;
@@ -220,29 +288,86 @@
   .imageCell {
     max-width: 120px;
   }
-  .actionsColumn {
-    position: sticky;
-    right: 0;
-    background: var(--bg-sticky);
-    box-shadow: 1px 0 0 var(--bg-sticky);
-    transform: translateZ(0);
-    z-index: 10;
+  .desktopTable { display: none; }
+  .mobileCards { display: flex; flex-direction: column; gap: 0.75rem; }
+  .containerCard {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
-  .nameColumn {
-    position: sticky;
-    left: 0;
-    background: var(--bg-sticky);
-    box-shadow: -1px 0 0 var(--bg-sticky);
-    transform: translateZ(0);
-    z-index: 10;
+  .cardTopRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
   }
-  .actions {
+  .cardActions {
+    display: flex;
     flex-wrap: wrap;
-    max-width: 140px;
-    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
   }
-  .hideMobileText {
-    display: none;
+  .mobileSortBar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .sortChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .sortChip {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sortChip.activeSortChip {
+    background: var(--bg-glass);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+  }
+  .sortIcon {
+    display: flex;
+    align-items: center;
+  }
+  .labeledRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    word-break: break-all;
+    font-size: 0.9rem;
+    flex-wrap: wrap;
+  }
+  .bulkActionBar {
+    position: sticky;
+    top: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    z-index: 20;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 }
 

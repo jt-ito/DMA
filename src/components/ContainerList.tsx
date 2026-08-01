@@ -93,6 +93,81 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     return 'asc';
   });
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleBulkAction = async (action: string) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    
+    if (action === 'update') {
+      const composeContainers = containers.filter(c => selectedIds.has(c.ID) && c.Project && c.Service && c.WorkingDir);
+      if (composeContainers.length === 0) return;
+      
+      const confirmed = await showConfirm(
+        'Update Compose Services',
+        `Are you sure you want to pull the latest image and recreate ${composeContainers.length} compose service(s)?`
+      );
+      if (!confirmed) return;
+      
+      const failed: { name: string, error: string }[] = [];
+      
+      for (const c of composeContainers) {
+        try {
+          await handleUpdateCompose(c, true, true);
+        } catch (e: any) {
+          console.error(e);
+          failed.push({ name: c.Names, error: e.message || String(e) });
+        }
+      }
+      
+      setSelectedIds(new Set());
+      fetchContainers();
+      
+      if (failed.length > 0) {
+        const msg = failed.map(f => `- ${f.name}: ${f.error}`).join('\n');
+        showAlert('Bulk Update Failed', `The update failed for the following containers:\n\n${msg}`);
+      }
+      return;
+    }
+    
+    if (action === 'remove' || action === 'stop') {
+      const isRemove = action === 'remove';
+      const confirmed = await showConfirm(
+        isRemove ? 'Remove Containers' : 'Stop Containers',
+        isRemove 
+          ? `Are you sure you want to permanently remove ${ids.length} containers? This action cannot be undone.`
+          : `Are you sure you want to stop ${ids.length} containers?`
+      );
+      if (!confirmed) return;
+    }
+
+    const stateMapping: Record<string, string> = { start: 'starting', stop: 'stopping', restart: 'restarting', remove: 'removing' };
+    const loadingState = stateMapping[action] || 'updating';
+
+    const failed: { name: string, error: string }[] = [];
+    const targetContainers = containers.filter(c => selectedIds.has(c.ID));
+
+    targetContainers.forEach(c => setContainerState(c.Names, loadingState));
+
+    for (const c of targetContainers) {
+      try {
+        await apiPost('/api/containers', { envId, containerId: c.ID, action });
+      } catch (e: any) {
+        console.error(e);
+        failed.push({ name: c.Names, error: e.message || String(e) });
+      }
+    }
+
+    targetContainers.forEach(c => setContainerState(c.Names, null));
+    setSelectedIds(new Set());
+    fetchContainers();
+
+    if (failed.length > 0) {
+      const msg = failed.map(f => `- ${f.name}: ${f.error}`).join('\n');
+      showAlert('Bulk Action Failed', `The action failed for the following containers:\n\n${msg}`);
+    }
+  };
+
   useEffect(() => {
     localStorage.setItem('containerSortColumn', sortColumn);
     localStorage.setItem('containerSortDirection', sortDirection);
@@ -355,14 +430,16 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
     setContainerState(container.Names, null);
   };
 
-  const handleUpdateCompose = async (container: DockerContainer, skipFetch = false) => {
+  const handleUpdateCompose = async (container: DockerContainer, skipFetch = false, skipConfirm = false) => {
     if (!container.WorkingDir || !container.Service) return;
     
-    const confirmed = await showConfirm(
-      'Update Compose Service',
-      `Are you sure you want to pull the latest image and recreate the service "${container.Service}"?`
-    );
-    if (!confirmed) return;
+    if (!skipConfirm) {
+      const confirmed = await showConfirm(
+        'Update Compose Service',
+        `Are you sure you want to pull the latest image and recreate the service "${container.Service}"?`
+      );
+      if (!confirmed) return;
+    }
 
     try {
       // 1. Stop
@@ -680,10 +757,70 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
         </div>
       </div>
       
-      <div className={styles.tableContainer}>
+      <div className={`${styles.tableContainer} ${styles.desktopTable}`}>
+        {(() => {
+          if (selectedIds.size === 0) return null;
+          const hasSelectedCompose = containers.some(c => selectedIds.has(c.ID) && c.Project && c.Service && c.WorkingDir);
+          const hasAvailableUpdates = containers.some(c => selectedIds.has(c.ID) && c.Project && c.Service && c.WorkingDir && imageUpdates[c.Image]?.available);
+          return (
+            <div className={styles.desktopBulkActionBar}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                {selectedIds.size} selected
+              </div>
+              <div className={styles.bulkActions}>
+                {hasSelectedCompose && (
+                  <button 
+                    title="Update Selected Compose Services" 
+                    className={`${styles.actionBtn} ${styles.primary}`} 
+                    onClick={() => handleBulkAction('update')} 
+                    disabled={updatingAll}
+                  >
+                    {hasAvailableUpdates && (
+                      <span>
+                        <AlertCircle color="var(--success)" size={16} style={{ marginRight: 4 }} />
+                      </span>
+                    )}
+                    <RefreshCw size={16} />
+                  </button>
+                )}
+                <button title="Start Selected" className={styles.actionBtn} onClick={() => handleBulkAction('start')} disabled={updatingAll}>
+                  <Play size={16} />
+                </button>
+                <button title="Stop Selected" className={styles.actionBtn} onClick={() => handleBulkAction('stop')} disabled={updatingAll}>
+                  <Square size={16} />
+                </button>
+                <button title="Restart Selected" className={styles.actionBtn} onClick={() => handleBulkAction('restart')} disabled={updatingAll}>
+                  <RotateCcw size={16} />
+                </button>
+                <button title="Remove Selected" className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleBulkAction('remove')} disabled={updatingAll}>
+                  <Trash2 size={16} />
+                </button>
+                <button title="Clear Selection" className={styles.closeBtn} onClick={() => setSelectedIds(new Set())} style={{ marginLeft: '0.5rem' }}>
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         <table className={styles.table}>
           <thead>
             <tr>
+              <th style={{ width: '40px' }}>
+                <label className={styles.customCheckbox} title="Select All Visible">
+                  <input 
+                    type="checkbox" 
+                    checked={sortedContainers.length > 0 && selectedIds.size === sortedContainers.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(new Set(sortedContainers.map(c => c.ID)));
+                      } else {
+                        setSelectedIds(new Set());
+                      }
+                    }}
+                  />
+                  <span className={styles.checkmark}></span>
+                </label>
+              </th>
               <th className={styles.nameColumn} onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   Name {sortColumn === 'name' && (sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
@@ -727,9 +864,24 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
               
               return (
                 <tr key={c.Names} className={isLoading ? styles.loadingRow : ''}>
+                  <td>
+                    <label className={styles.customCheckbox}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.has(c.ID)}
+                        onChange={(e) => {
+                          const newSet = new Set(selectedIds);
+                          if (e.target.checked) newSet.add(c.ID);
+                          else newSet.delete(c.ID);
+                          setSelectedIds(newSet);
+                        }}
+                      />
+                      <span className={styles.checkmark}></span>
+                    </label>
+                  </td>
                   <td className={styles.nameColumn}>
                     <div className={styles.nameCell}>
-                    <strong>{c.Names}</strong>
+                      <strong>{c.Names}</strong>
                     <span className={styles.idText}>{c.ID.substring(0, 12)}</span>
                     {(() => {
                       if (!c.Ports) return null;
@@ -855,6 +1007,263 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
             })}
           </tbody>
         </table>
+        {containers.length === 0 && !loading && (
+          <div className={styles.empty}>No containers found in this environment.</div>
+        )}
+      </div>
+
+      <div className={styles.mobileCards}>
+        <div className={styles.mobileSortBar}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label className={styles.customCheckbox} title="Select All Visible">
+              <input 
+                type="checkbox" 
+                checked={sortedContainers.length > 0 && selectedIds.size === sortedContainers.length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedIds(new Set(sortedContainers.map(c => c.ID)));
+                  } else {
+                    setSelectedIds(new Set());
+                  }
+                }}
+              />
+              <span className={styles.checkmark}></span>
+            </label>
+            <span className={styles.muted}>Sort by:</span>
+          </div>
+          <div className={styles.sortChips}>
+            {(['name', 'state', 'image', 'composeProject'] as SortColumn[]).map(col => (
+              <button 
+                key={col}
+                className={`${styles.sortChip} ${sortColumn === col ? styles.activeSortChip : ''}`}
+                onClick={() => handleSort(col)}
+              >
+                {col === 'name' ? 'Name' : col === 'state' ? 'State' : col === 'image' ? 'Image' : 'Project'}
+                {sortColumn === col && (
+                  <span className={styles.sortIcon}>
+                    {sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(() => {
+          if (selectedIds.size === 0) return null;
+          const hasSelectedCompose = containers.some(c => selectedIds.has(c.ID) && c.Project && c.Service && c.WorkingDir);
+          const hasAvailableUpdates = containers.some(c => selectedIds.has(c.ID) && c.Project && c.Service && c.WorkingDir && imageUpdates[c.Image]?.available);
+          return (
+            <div className={styles.bulkActionBar}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                {selectedIds.size} selected
+              </div>
+              <div className={styles.bulkActions}>
+                {hasSelectedCompose && (
+                  <button 
+                    title="Update Selected Compose Services" 
+                    className={`${styles.actionBtn} ${styles.primary}`} 
+                    onClick={() => handleBulkAction('update')} 
+                    disabled={updatingAll}
+                  >
+                    {hasAvailableUpdates && (
+                      <span>
+                        <AlertCircle color="var(--success)" size={16} style={{ marginRight: 4 }} />
+                      </span>
+                    )}
+                    <RefreshCw size={16} />
+                  </button>
+                )}
+                <button title="Start Selected" className={styles.actionBtn} onClick={() => handleBulkAction('start')} disabled={updatingAll}>
+                  <Play size={16} />
+              </button>
+              <button title="Stop Selected" className={styles.actionBtn} onClick={() => handleBulkAction('stop')} disabled={updatingAll}>
+                <Square size={16} />
+              </button>
+              <button title="Restart Selected" className={styles.actionBtn} onClick={() => handleBulkAction('restart')} disabled={updatingAll}>
+                <RotateCcw size={16} />
+              </button>
+              <button title="Remove Selected" className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleBulkAction('remove')} disabled={updatingAll}>
+                <Trash2 size={16} />
+              </button>
+              <button title="Clear Selection" className={styles.closeBtn} onClick={() => setSelectedIds(new Set())} style={{ marginLeft: '0.5rem' }}>
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+        {sortedContainers.map(c => {
+          const granularState = granularStates[c.Names];
+          const displayState = granularState || c.State;
+          const isRunning = displayState === 'running';
+          const isCompose = c.Project && c.Service && c.WorkingDir;
+          const isLoading = granularState != null;
+          
+          const badgeClass = 
+            displayState === 'running' ? 'badge-success' : 
+            displayState === 'pulling' ? 'badge-pulling' :
+            displayState === 'starting' ? 'badge-starting' :
+            displayState === 'cleaning' ? 'badge-cleaning' :
+            displayState === 'stopping' ? 'badge-stopping' :
+            displayState === 'removing' ? 'badge-removing' :
+            displayState === 'restarting' ? 'badge-restarting' :
+            'badge-danger';
+
+          return (
+            <div key={c.Names} className={`${styles.containerCard} ${isLoading ? styles.loadingRow : ''}`}>
+              <div className={styles.cardTopRow}>
+                <label className={styles.customCheckbox} style={{ flexShrink: 0, marginRight: '0.25rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedIds.has(c.ID)}
+                    onChange={(e) => {
+                      const newSet = new Set(selectedIds);
+                      if (e.target.checked) newSet.add(c.ID);
+                      else newSet.delete(c.ID);
+                      setSelectedIds(newSet);
+                    }}
+                  />
+                  <span className={styles.checkmark}></span>
+                </label>
+                <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.Names}</strong>
+                  <span className={styles.idText}>{c.ID.substring(0, 12)}</span>
+                </div>
+              </div>
+              
+              <div className={styles.labeledRow}>
+                <span className={styles.muted}>State:</span>
+                <span className={`badge ${badgeClass}`} style={{ flexShrink: 0 }}>
+                  {displayState}
+                </span>
+              </div>
+
+              <div className={styles.labeledRow}>
+                <span className={styles.muted}>Image:</span>
+                <span>{c.Image}</span>
+              </div>
+
+              {isCompose && (
+                <div className={styles.composeInfo}>
+                  <div className={styles.labeledRow}>
+                    <span className={styles.muted}>Project:</span>
+                    <span className={styles.projectText}>{c.Project}</span>
+                  </div>
+                  <div className={styles.labeledRow}>
+                    <span className={styles.muted}>Service:</span>
+                    <span className={styles.serviceText}>{c.Service}</span>
+                  </div>
+                </div>
+              )}
+
+              {c.Status && c.Status.startsWith('Up ') && (
+                <div className={styles.labeledRow}>
+                  <span className={styles.muted}>Uptime:</span>
+                  <span className={styles.uptimeText} style={{ marginLeft: 0 }}>
+                    {c.Status.substring(3)}
+                  </span>
+                </div>
+              )}
+
+              {(() => {
+                if (!c.Ports) return null;
+                const ip = env.type === 'local' ? 'localhost' : (env.host || 'localhost');
+                const parts = c.Ports.split(', ');
+                const publishedPorts: { hostPort: string, fullPart: string }[] = [];
+                for (const part of parts) {
+                  if (part.includes('->')) {
+                    const [hostPart] = part.split('->');
+                    const hostIpAndPort = hostPart.split(':');
+                    const hostPort = hostIpAndPort[hostIpAndPort.length - 1];
+                    if (!publishedPorts.find(p => p.hostPort === hostPort)) {
+                      publishedPorts.push({ hostPort, fullPart: part });
+                    }
+                  }
+                }
+                if (publishedPorts.length === 0) return null;
+                return (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                    {publishedPorts.map(p => (
+                      <a 
+                        key={p.hostPort} 
+                        href={`http://${ip}:${p.hostPort}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={styles.portLink}
+                        title={p.fullPart}
+                      >
+                        {p.hostPort}
+                      </a>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div className={styles.cardActions}>
+                {isRunning ? (
+                  <button title="Stop" className={styles.actionBtn} onClick={() => handleAction(c, 'stop')} disabled={isLoading}>
+                    <Square size={16} />
+                  </button>
+                ) : (
+                  <button title="Start" className={styles.actionBtn} onClick={() => handleAction(c, 'start')} disabled={isLoading}>
+                    <Play size={16} />
+                  </button>
+                )}
+                
+                <button title="Restart" className={styles.actionBtn} onClick={() => handleAction(c, 'restart')} disabled={isLoading}>
+                  <RotateCcw size={16} />
+                </button>
+                
+                <button title="Remove" className={`${styles.actionBtn} ${styles.danger}`} onClick={() => handleAction(c, 'remove')} disabled={isLoading}>
+                  <Trash2 size={16} />
+                </button>
+                
+                <button title="View Logs" className={styles.actionBtn} onClick={() => handleViewLogs(c)} disabled={isLoading}>
+                  <FileText size={16} />
+                </button>
+                <button title="View Stats" className={styles.actionBtn} onClick={() => handleViewStats(c)} disabled={isLoading}>
+                  <Activity size={16} />
+                </button>
+                <button title="Change Restart Policy" className={styles.actionBtn} onClick={() => {
+                   setSelectedContainerId(c.ID);
+                   setSelectedContainerName(c.Names);
+                   setSelectedPolicy(c.RestartPolicy || 'unless-stopped');
+                   setPolicyModalOpen(true);
+                }} disabled={isLoading}>
+                  <Settings size={16} />
+                </button>
+
+                {isCompose && (
+                  <>
+                    <button 
+                      title="Update Service" 
+                      className={`${styles.actionBtn} ${styles.primary}`} 
+                      onClick={() => handleUpdateCompose(c)} 
+                      disabled={isLoading}
+                    >
+                      {imageUpdates[c.Image]?.available && (
+                        <span>
+                          <AlertCircle color="var(--success)" size={16} style={{ marginRight: 4 }} />
+                        </span>
+                      )}
+                      <RefreshCw size={16} /> <span className={styles.hideMobileText}>Update</span>
+                    </button>
+                    <button 
+                      title="Down Compose Service" 
+                      className={`${styles.actionBtn} ${styles.warning}`} 
+                      onClick={() => handleDownCompose(c)} 
+                      disabled={isLoading}
+                    >
+                      <ShieldAlert size={16} /> <span className={styles.hideMobileText}>Down Service</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
         {containers.length === 0 && !loading && (
           <div className={styles.empty}>No containers found in this environment.</div>
         )}
