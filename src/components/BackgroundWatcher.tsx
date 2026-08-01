@@ -10,11 +10,13 @@ export function BackgroundWatcher() {
 
   useEffect(() => {
     let isActive = true;
+    const abortController = new AbortController();
 
     const checkEnvironments = async () => {
+      if (!isActive) return;
       try {
         // Fetch all environments
-        const envRes = await fetch('/api/environments');
+        const envRes = await fetch('/api/environments', { signal: abortController.signal });
         if (!envRes.ok) return;
         const environments: Environment[] = await envRes.json();
 
@@ -25,7 +27,7 @@ export function BackgroundWatcher() {
           if (!isActive) break;
 
           try {
-            const containerRes = await fetch(`/api/containers?envId=${env.id}`);
+            const containerRes = await fetch(`/api/containers?envId=${env.id}`, { signal: abortController.signal });
             if (!containerRes.ok) continue;
             const containers: DockerContainer[] = await containerRes.json();
 
@@ -57,11 +59,15 @@ export function BackgroundWatcher() {
               // Update previous state
               previousStates.current[container.ID] = container;
             });
-          } catch (err) {
+          } catch (err: any) {
+            if (err.name === 'AbortError') return;
+            if (err.name === 'TypeError' && err.message === 'Failed to fetch') return;
             console.error(`Error polling containers for env ${env.name}:`, err);
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        if (err.name === 'TypeError' && err.message === 'Failed to fetch') return;
         console.error('Error in background watcher:', err);
       }
     };
@@ -100,6 +106,7 @@ export function BackgroundWatcher() {
 
     return () => {
       isActive = false;
+      abortController.abort();
       clearInterval(interval);
     };
   }, []);
