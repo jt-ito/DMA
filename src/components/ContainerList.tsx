@@ -645,14 +645,20 @@ export function ContainerList({ envId, env, isDeploying }: Props) {
       const data = await res.json();
       setExecHistoryLines(prev => [...prev, { cmd, ...data.result }]);
       setExecCommandText('');
-      setTimeout(scrollToBottom, 100);
+      setTimeout(() => {
+        scrollToBottom();
+        execInputRef.current?.focus();
+      }, 100);
     } catch (err: any) {
       setExecHistoryLines(prev => [...prev, {
         cmd,
         stdout: '',
         stderr: err.message || String(err),
       }]);
-      setTimeout(scrollToBottom, 100);
+      setTimeout(() => {
+        scrollToBottom();
+        execInputRef.current?.focus();
+      }, 100);
     }
     setIsExecuting(false);
   };
